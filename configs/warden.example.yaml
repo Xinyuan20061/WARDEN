@@ -1,0 +1,17 @@
+# 部署方可将该文件映射到自有组合根；默认 CLI 仅读取同名 WARDEN_* 环境变量。
+api:
+  host: 127.0.0.1
+  port: 8765
+
+storage:
+  artifact_root: .warden/artifacts
+  probe_root: artifacts/probes
+  sae_root: artifacts/sae
+
+# 生成 FRACTAL-Bench 数据集后填写 dataset.json 或其所在目录。
+fractal_bench:
+  dataset_path: null
+
+# ModelRuntime 由部署代码注入。WARDEN 不从配置猜测模型架构或层映射。
+runtime:
+  adapter: null

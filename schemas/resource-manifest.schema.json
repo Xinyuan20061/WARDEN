@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Xinyuan20061/WARDEN/schemas/resource-manifest.schema.json",
+  "title": "WARDEN Resource Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["resource_id", "kind", "version", "state", "backend"],
+  "properties": {
+    "resource_id": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["probe", "sae"]},
+    "version": {"type": "string", "minLength": 1},
+    "state": {"enum": ["declared", "ready", "unavailable", "invalid"]},
+    "backend": {"type": "string", "minLength": 1},
+    "model_id": {"type": ["string", "null"]},
+    "tensor_ref": {"type": ["string", "null"]},
+    "training_fingerprint": {"type": ["string", "null"]},
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {"type": "number"}
+    },
+    "metadata": {"type": "object"},
+    "artifact": {
+      "type": ["object", "null"],
+      "required": ["artifact_id", "kind", "uri", "content_hash", "media_type"],
+      "properties": {
+        "artifact_id": {"type": "string"},
+        "kind": {"type": "string"},
+        "uri": {"type": "string"},
+        "content_hash": {"type": "string"},
+        "media_type": {"type": "string"},
+        "size_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "metadata": {"type": "object"}
+      }
+    }
+  }
+}

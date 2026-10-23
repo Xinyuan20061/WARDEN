@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Xinyuan20061/WARDEN/schemas/run-request.schema.json",
+  "title": "WARDEN Run Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["plan_id"],
+  "properties": {
+    "plan_id": {"type": "string", "minLength": 1}
+  }
+}

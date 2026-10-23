@@ -1,0 +1,6 @@
+[submodule "vendor/stegopot"]
+	path = vendor/stegopot
+	url = https://github.com/Xinyuan20061/stegopot.git
+[submodule "vendor/fractal-bench"]
+	path = vendor/fractal-bench
+	url = https://github.com/Xinyuan20061/FRACTAL-Bench.git

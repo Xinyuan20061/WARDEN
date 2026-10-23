@@ -1,0 +1,35 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pytest-tmp*/
+.ruff_cache/
+.tmp-*/
+.build-tmp*/
+.wheel-smoke/
+build/
+dist/
+dist-release/
+
+.env
+.env.*
+!.env.example
+
+# 训练权重、激活和运行工件不进入源码仓库。
+# 资源清单、配置和 Model Card 可以随源码发布。
+artifacts/probes/**/weights.*
+artifacts/probes/**/checkpoint*
+artifacts/sae/**/weights.*
+artifacts/sae/**/checkpoint*
+artifacts/activations/
+artifacts/runs/
+*.pt
+*.pth
+*.safetensors
+*.npz
+
+# 本地实验与平台状态。
+experiments/
+results/
+.warden/
