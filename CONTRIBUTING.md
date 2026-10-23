@@ -1,6 +1,7 @@
 # Contributing
 
-1. 初始化 submodule：`git submodule update --init --recursive`。
+1. 初始化公开 submodule：`git submodule update --init --recursive vendor/stegopot`。需要运行
+   FRACTAL-Bench 集成测试时，再使用已授权账号初始化 `vendor/fractal-bench`。
 2. 创建 Python 3.11+ 虚拟环境。
 3. 安装开发依赖：`pip install -e ".[api,probe,dev]"`。
 4. 按 `AGENTS.md` 保持依赖方向和科研完整性。

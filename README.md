@@ -82,8 +82,9 @@ WARDEN 发布 Probe 和 SAE 的接口、参考实现、工件清单与评价约�
 ## Installation
 
 ```bash
-git clone --recurse-submodules https://github.com/Xinyuan20061/WARDEN.git
+git clone https://github.com/Xinyuan20061/WARDEN.git
 cd WARDEN
+git submodule update --init --recursive vendor/stegopot
 
 python -m venv .venv
 # Windows: .venv\Scripts\activate
@@ -91,9 +92,18 @@ python -m venv .venv
 
 python -m pip install --upgrade pip
 pip install -e vendor/stegopot
-pip install -e vendor/fractal-bench
 pip install -e ".[api,probe,dev]"
 ```
+
+FRACTAL-Bench 是可选威胁契约源。对该仓库具有访问权限的协作者可继续初始化并安装：
+
+```bash
+git submodule update --init vendor/fractal-bench
+pip install -e vendor/fractal-bench
+```
+
+部署也可通过自定义 `ThreatContractSource` 使用其他基准或业务系统，不强制依赖
+FRACTAL-Bench。
 
 白盒模型与公开 SAE 需要额外安装 StegoPot 对应依赖：
 
