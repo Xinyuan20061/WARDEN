@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "warden-kernel"
-version = "0.1.0"
+version = "0.2.0"
 description = "面向多智能体协调下有害交互的因果审计及可控防御内核。"
 readme = "README.md"
 requires-python = ">=3.11"

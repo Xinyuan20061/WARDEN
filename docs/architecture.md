@@ -42,6 +42,7 @@ infrastructure -----------> core
 
 - 资源目录只登记经过清单验证的资源。
 - 计划编译器检查能力、训练资源和模型位置，不猜测层号或 Hook。
+- `PipelineAuditExecutor` 按计划运行可注册阶段，聚合证据并保留失败语义。
 - 应用服务为 REST、SDK 和研究脚本提供同一入口。
 
 ### Infrastructure

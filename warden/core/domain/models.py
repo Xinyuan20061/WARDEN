@@ -323,7 +323,10 @@ class EvidenceBundle:
         object.__setattr__(self, "artifacts", tuple(self.artifacts))
         object.__setattr__(self, "risk_scores", tuple(self.risk_scores))
         object.__setattr__(self, "findings", tuple(_freeze_mapping(item) for item in self.findings))
-        object.__setattr__(self, "metrics", _freeze_mapping(self.metrics))
+        metrics = {str(key): float(value) for key, value in self.metrics.items()}
+        if any(not math.isfinite(value) for value in metrics.values()):
+            raise ValueError("证据指标必须是有限数")
+        object.__setattr__(self, "metrics", _freeze_mapping(metrics))
         object.__setattr__(self, "limitations", tuple(self.limitations))
 
 

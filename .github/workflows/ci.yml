@@ -21,7 +21,7 @@ jobs:
           pip install -e ".[api,probe,dev]"
       - name: Check
         run: |
-          ruff check warden tests
-          python -m compileall -q warden tests
+          ruff check warden tests examples
+          python -m compileall -q warden tests examples
           pytest
           python -m build

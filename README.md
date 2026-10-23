@@ -64,6 +64,9 @@ run_id
 审计请求经过预检后形成 `AuditPlan`。缺少白盒能力、层级映射、Probe 或 SAE 权重时，计划
 会进入 `blocked` 状态并返回具体原因；内核不会生成模拟分数或假装完成因果审计。
 
+`PipelineAuditExecutor` 在预检后按计划执行可注册阶段。具体场景只需提供特定的
+Probe、SAE 与阶段数据适配，无需重写任务状态、证据聚合和失败处理。
+
 ## Probe and SAE
 
 WARDEN 发布 Probe 和 SAE 的接口、参考实现、工件清单与评价约定，但不在 Git 仓库提交
@@ -121,6 +124,14 @@ warden contracts
 
 新仓库不附带训练资源，因此首次运行 `warden doctor` 时 Probe 和 SAE 目录为空属于正常
 状态。注入模型 Runtime、威胁数据集和训练 Artifact 后，能力报告会明确显示可用状态。
+
+本地执行器端到端烟测：
+
+```bash
+python examples/local_tiny_audit.py
+```
+
+该示例使用微型合成模型并真实训练线性 Probe，只验证软件链路，不代表共谋研究结论。
 
 ## Platform API
 
@@ -182,6 +193,7 @@ artifacts/              只提交说明，不提交权重
 
 - [Architecture](docs/architecture.md)
 - [API Contract](docs/api.md)
+- [Audit Executor](docs/executor.md)
 - [Artifact Contract](docs/artifacts.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
