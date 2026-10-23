@@ -1,11 +1,15 @@
 """本地微型模型完整执行链测试。"""
 
+from pathlib import Path
+from runpy import run_path
+
 import pytest
 
 pytest.importorskip("numpy")
 pytest.importorskip("sklearn")
 
-from examples.local_tiny_audit import run_demo  # noqa: E402
+_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "local_tiny_audit.py"
+run_demo = run_path(str(_EXAMPLE))["run_demo"]
 
 
 def test_tiny_audit_completes_detection_attribution_and_intervention() -> None:
