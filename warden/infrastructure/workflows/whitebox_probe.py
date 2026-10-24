@@ -26,7 +26,6 @@ from warden.infrastructure.data import (
 )
 from warden.infrastructure.methods.probe import ProbeSuiteTrainer
 
-
 RunPhase = Literal["collect", "train", "all"]
 
 

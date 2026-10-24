@@ -9,7 +9,6 @@ from hashlib import sha256
 from types import MappingProxyType
 from typing import Any, Literal
 
-
 SplitName = Literal["train", "validation", "test"]
 _SPLITS = ("train", "validation", "test")
 
@@ -115,7 +114,7 @@ class InteractionDataset:
                 raise ValueError(f"案例家族跨切分泄漏：{item.family_id}")
             labels_by_split[item.split].add(item.label)
             for agent_id, text in item.inputs_by_agent.items():
-                digest = sha256(f"{agent_id}\0{text}".encode("utf-8")).hexdigest()
+                digest = sha256(f"{agent_id}\0{text}".encode()).hexdigest()
                 prior_split = text_splits.setdefault(digest, item.split)
                 if prior_split != item.split:
                     raise ValueError("完全相同的 Agent 输入不能跨数据切分出现")
