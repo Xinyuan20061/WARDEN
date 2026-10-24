@@ -6,10 +6,18 @@ from warden.infrastructure.methods.probe.linear import (
     SklearnLinearProbeTrainer,
     load_linear_probe,
 )
+from warden.infrastructure.methods.probe.suite import (
+    ProbeSuiteEntry,
+    ProbeSuiteReport,
+    ProbeSuiteTrainer,
+)
 
 __all__ = [
     "LinearProbe",
     "LinearProbeManifest",
+    "ProbeSuiteEntry",
+    "ProbeSuiteReport",
+    "ProbeSuiteTrainer",
     "SklearnLinearProbeTrainer",
     "load_linear_probe",
 ]

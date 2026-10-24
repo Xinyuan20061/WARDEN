@@ -36,6 +36,9 @@ interface composition ----> infrastructure
 - Probe/SAE 代码和清单规范进入主仓库；权重、activation 和训练数据不得提交。
 - 未加载权重时显式返回 `unavailable`，不得生成模拟分数或占位检测结果。
 - Probe 候选必须经过独立测试集评价；因果主张必须由 Patching 或干预实验支持。
+- Probe 数据必须按案例家族固定为 train/validation/test，反事实条件不得跨切分。
+- GPU Activation 采集与 CPU Probe 训练分阶段执行；重复实验应复用带哈希的 Corpus。
+- 单主体和联合主体 Probe 必须共享样本行顺序，并在清单中记录联合拼接顺序。
 
 ## 外部接口
 
@@ -60,6 +63,7 @@ python -m compileall -q warden tests
 python -m pytest
 python -m build
 warden doctor
+warden whitebox-preflight --config configs/whitebox/qwen25-1.5b-probe.json
 ```
 
 接口修改必须增加 contract test。适配器修改必须覆盖缺失依赖、能力不足和资源关闭。

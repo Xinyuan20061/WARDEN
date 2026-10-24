@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 - 2026-10-24
+
+- 新增家族隔离的三分交互数据合同，阻止反事实样本和完全相同输入跨切分泄漏。
+- 新增 StegoPot 真实模型 Activation 特征提取器和带 SHA-256 校验的 Activation Corpus。
+- 新增逐层单主体/联合主体 Probe Suite，使用训练集拟合、验证集选层、测试集最终评价。
+- 新增 Probe 风险方向拆分与分数加权 Activation 干预算子。
+- 新增 AutoDL 白盒实验预检、分阶段 CLI、Qwen2.5-1.5B 参考配置和完整运行文档。
+
 ## 0.2.0 - 2026-10-23
 
 - 新增可注册分阶段 `PipelineAuditExecutor`、执行上下文与失败证据保留。

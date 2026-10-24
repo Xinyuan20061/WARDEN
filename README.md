@@ -133,6 +133,40 @@ python examples/local_tiny_audit.py
 
 该示例使用微型合成模型并真实训练线性 Probe，只验证软件链路，不代表共谋研究结论。
 
+## White-box Model Workflow
+
+WARDEN 提供面向真实 Hugging Face 模型的两阶段白盒工作流：
+
+```text
+JSONL interactions
+  -> family-disjoint contract validation
+  -> StegoPot selective forward on GPU
+  -> hash-verified Activation Corpus
+  -> per-agent and joint Probe Suite on CPU
+  -> validation-only layer selection
+  -> held-out test report
+```
+
+参考配置使用 Qwen2.5-1.5B-Instruct，并显式采集多个 `resid_post` 层。多个 Agent 顺序复用
+同一个 StegoPot `ModelRuntime`，单卡只保存一份模型权重。
+
+```bash
+warden whitebox-preflight \
+  --config configs/whitebox/qwen25-1.5b-probe.json
+
+warden whitebox-run \
+  --config configs/whitebox/qwen25-1.5b-probe.json \
+  --phase collect
+
+warden whitebox-run \
+  --config configs/whitebox/qwen25-1.5b-probe.json \
+  --phase train
+```
+
+`collect` 需要本地模型快照和 GPU；`train` 只读取已保存的 Corpus，可以在 CPU 上执行。
+数据字段、AutoDL 安装、模型下载、输出结构和因果解释边界见
+[`docs/whitebox-workflow.md`](docs/whitebox-workflow.md)。
+
 ## Platform API
 
 启动本地 API：
@@ -177,10 +211,13 @@ warden/
   core/                 纯领域对象和 Protocol
   application/          审计计划与用例编排
   infrastructure/
+    data/               交互数据加载与 Activation Corpus
     methods/probe/      Probe 训练、保存和推理
     methods/sae/        SAE 分解与重构审计
+    methods/intervention/ Probe 风险方向干预
     adapters/           StegoPot 与 FRACTAL-Bench 适配
     storage/            内容寻址工件与清单发现
+    workflows/          可分阶段运行的真实模型白盒流程
   interface/            REST API、Python SDK 和 CLI
 vendor/
   stegopot/             Git submodule
@@ -194,6 +231,7 @@ artifacts/              只提交说明，不提交权重
 - [Architecture](docs/architecture.md)
 - [API Contract](docs/api.md)
 - [Audit Executor](docs/executor.md)
+- [White-box Workflow](docs/whitebox-workflow.md)
 - [Artifact Contract](docs/artifacts.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)

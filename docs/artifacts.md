@@ -24,6 +24,13 @@ Probe 清单至少记录：
 - 独立测试集指标；
 - 权重 SHA-256。
 
+参考线性 Probe 使用两层清单：
+
+- `manifest.json` 保存算法输入合同、阈值和权重哈希；
+- `resource-manifest.json` 把该 Probe 暴露给 WARDEN `ResourceCatalog`。
+
+`WARDEN_PROBE_ROOT` 可以指向单个 Probe 目录或包含多个 Probe 的父目录。
+
 SAE 清单至少记录：
 
 - SAE ID、来源和许可证；

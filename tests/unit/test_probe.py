@@ -9,6 +9,7 @@ from warden.infrastructure.methods.probe.linear import (  # noqa: E402
     SklearnLinearProbeTrainer,
     load_linear_probe,
 )
+from warden.infrastructure.storage.resources import discover_resource_manifests  # noqa: E402
 
 
 def test_linear_probe_train_save_load_roundtrip(tmp_path) -> None:
@@ -40,3 +41,7 @@ def test_linear_probe_train_save_load_roundtrip(tmp_path) -> None:
     assert artifact.kind == "probe"
     assert len(scores) == 4
     assert scores[0].value < scores[-1].value
+    resources = discover_resource_manifests(tmp_path / "probe")
+    assert len(resources) == 1
+    assert resources[0].resource_id == "test-probe"
+    assert resources[0].artifact is not None

@@ -262,7 +262,7 @@ class SklearnLinearProbeTrainer:
         combined_hash = sha256(
             manifest_path.read_bytes() + weights_path.read_bytes()
         ).hexdigest()
-        return ArtifactRef(
+        artifact = ArtifactRef(
             artifact_id=f"probe-{combined_hash}",
             kind="probe",
             uri=destination.resolve().as_uri(),
@@ -271,6 +271,36 @@ class SklearnLinearProbeTrainer:
             size_bytes=manifest_path.stat().st_size + weights_path.stat().st_size,
             metadata={"probe_id": manifest.probe_id, "version": manifest.version},
         )
+        _write_json_atomic(
+            {
+                "resource_id": manifest.probe_id,
+                "kind": "probe",
+                "version": manifest.version,
+                "state": "ready",
+                "backend": "sklearn.logistic_regression",
+                "artifact": {
+                    "artifact_id": artifact.artifact_id,
+                    "kind": artifact.kind,
+                    "uri": artifact.uri,
+                    "content_hash": artifact.content_hash,
+                    "media_type": artifact.media_type,
+                    "size_bytes": artifact.size_bytes,
+                    "metadata": dict(artifact.metadata),
+                },
+                "model_id": manifest.model_id,
+                "tensor_ref": manifest.tensor_ref,
+                "training_fingerprint": manifest.training_fingerprint,
+                "metrics": dict(manifest.metrics),
+                "metadata": {
+                    "positive_label": manifest.positive_label,
+                    "feature_width": manifest.feature_width,
+                    "threshold": manifest.threshold,
+                    **dict(manifest.metadata),
+                },
+            },
+            destination / "resource-manifest.json",
+        )
+        return artifact
 
 
 def load_linear_probe(path: Path) -> LinearProbe:

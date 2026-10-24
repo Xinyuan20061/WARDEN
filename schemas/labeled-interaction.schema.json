@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Xinyuan20061/WARDEN/schemas/labeled-interaction.schema.json",
+  "title": "WARDEN Labeled Interaction",
+  "description": "白盒 Activation 数据集的一行 JSONL 样本。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sample_id",
+    "family_id",
+    "split",
+    "label",
+    "inputs_by_agent"
+  ],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "样本稳定标识。"
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "反事实案例家族标识，同一家族只能属于一个 split。"
+    },
+    "split": {
+      "enum": ["train", "validation", "test"],
+      "description": "预先声明的数据切分。"
+    },
+    "label": {
+      "type": "integer",
+      "enum": [0, 1],
+      "description": "0 表示对照，1 表示风险条件。"
+    },
+    "inputs_by_agent": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Agent ID 到该主体模型输入文本的映射。"
+    },
+    "metadata": {
+      "type": "object",
+      "default": {},
+      "description": "不包含凭证和隐藏真值的附加元数据。"
+    }
+  }
+}

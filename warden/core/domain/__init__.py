@@ -1,5 +1,6 @@
 """WARDEN 核心领域对象。"""
 
+from warden.core.domain.datasets import InteractionDataset, LabeledInteraction, SplitName
 from warden.core.domain.enums import AuditMode, EventKind, ResourceState, RunStatus
 from warden.core.domain.models import (
     ActivationCoordinate,
@@ -31,10 +32,13 @@ __all__ = [
     "EventKind",
     "InterventionPlan",
     "InterventionTarget",
+    "InteractionDataset",
+    "LabeledInteraction",
     "ResourceManifest",
     "ResourceState",
     "RiskScore",
     "RunStatus",
+    "SplitName",
     "ThreatContract",
     "to_primitive",
 ]

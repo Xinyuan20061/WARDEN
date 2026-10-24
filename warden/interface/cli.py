@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -29,6 +30,22 @@ def build_parser() -> argparse.ArgumentParser:
     serve = commands.add_parser("serve", help="启动供测试平台调用的 REST API")
     serve.add_argument("--host", default=os.getenv("WARDEN_HOST", "127.0.0.1"))
     serve.add_argument("--port", type=int, default=int(os.getenv("WARDEN_PORT", "8765")))
+    whitebox_preflight = commands.add_parser(
+        "whitebox-preflight",
+        help="不加载模型地检查白盒 Probe 实验配置",
+    )
+    whitebox_preflight.add_argument("--config", type=Path, required=True)
+    whitebox_run = commands.add_parser(
+        "whitebox-run",
+        help="采集真实 Activation 并训练多主体 Probe Suite",
+    )
+    whitebox_run.add_argument("--config", type=Path, required=True)
+    whitebox_run.add_argument(
+        "--phase",
+        choices=("collect", "train", "all"),
+        default="all",
+        help="collect 使用模型/GPU，train 只消费已有 Corpus，all 顺序执行",
+    )
     return parser
 
 
@@ -61,6 +78,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         from warden.interface.api.app import create_app
 
         uvicorn.run(create_app(service), host=args.host, port=args.port)
+        return 0
+    if args.command in {"whitebox-preflight", "whitebox-run"}:
+        from warden.infrastructure.workflows import (
+            load_whitebox_probe_config,
+            preflight_whitebox_probe_experiment,
+            run_whitebox_probe_experiment,
+        )
+
+        config = load_whitebox_probe_config(args.config)
+        if args.command == "whitebox-preflight":
+            report = preflight_whitebox_probe_experiment(config)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 0 if report["ready"] else 2
+        summary = run_whitebox_probe_experiment(
+            config,
+            phase=args.phase,
+            progress=lambda message: print(f"[WARDEN] {message}", file=sys.stderr, flush=True),
+        )
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
     raise AssertionError(f"未处理命令：{args.command}")
 

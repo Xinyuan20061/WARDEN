@@ -35,6 +35,7 @@ infrastructure -----------> core
 - `ThreatContract`：与具体基准解耦的有害交互定义。
 - `AuditRequest` / `AuditPlan`：测试平台请求和预检后的执行计划。
 - `ResourceManifest`：Probe/SAE 的版本、状态、数据指纹和工件引用。
+- `LabeledInteraction` / `InteractionDataset`：家族隔离的白盒训练数据合同。
 - Ports：Activation、Runtime、Threat、Probe、SAE、Artifact 和 Event 协议。
 - `RunDispatcher`：隔离内核与本地线程、队列或分布式执行方案。
 
@@ -48,6 +49,8 @@ infrastructure -----------> core
 ### Infrastructure
 
 - Probe 参考实现负责训练与推理，不承担标签定义。
+- Activation Corpus 层把 GPU 采集结果冻结为带内容哈希的多主体特征流。
+- Probe Suite 在单主体和联合主体视图上逐层训练，验证集选层，测试集最终评价。
 - SAE Analyzer 负责分解与重构审计，不自动解释 Feature 语义。
 - StegoPot Adapter 把 CaptureTarget 转换为 TensorRef/TracePolicy。
 - StegoPot EAP Adapter 复用上游评分器，不在 WARDEN 重新实现归因公式。
@@ -59,12 +62,13 @@ infrastructure -----------> core
 
 - `/v1` API 是测试平台的稳定边界。
 - Python SDK 不暴露内部类路径。
-- CLI 提供依赖诊断、资源发现和本地服务启动。
+- CLI 提供依赖诊断、资源发现、本地服务和分阶段白盒实验入口。
 
 ## Offline and Online Boundary
 
 完整 EAP、跨层 Patching、SAE Feature 搜索和阈值选择属于离线审计。在线防御只加载已经
-在独立数据上验证的 Probe 与干预计划。当前版本首先固定这套边界，不宣称未训练资源可用。
+在独立数据上验证的 Probe 与干预计划。白盒工作流进一步把 GPU Activation 采集与 CPU
+Probe 训练分离，允许模型释放后复用同一 Corpus。内核不宣称未训练资源可用。
 
 ## Fail-closed Rules
 

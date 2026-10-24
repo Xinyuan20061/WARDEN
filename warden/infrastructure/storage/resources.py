@@ -12,17 +12,24 @@ from warden.core.domain.models import ArtifactRef, ResourceManifest
 
 
 def discover_resource_manifests(*roots: Path) -> tuple[ResourceManifest, ...]:
-    """递归读取 manifest.json，并拒绝重复资源标识。"""
+    """递归读取资源清单，并忽略同目录下的算法私有清单。"""
 
     resources: dict[str, ResourceManifest] = {}
     for root in roots:
         root = Path(root)
         if not root.exists():
             continue
-        for path in sorted(root.rglob("manifest.json")):
+        paths = sorted({*root.rglob("resource-manifest.json"), *root.rglob("manifest.json")})
+        for path in paths:
             value = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(value, dict):
                 raise ValueError(f"资源清单根节点必须是对象：{path}")
+            required = {"resource_id", "kind", "version", "state", "backend"}
+            if not required.issubset(value):
+                if path.name == "resource-manifest.json":
+                    missing = sorted(required - set(value))
+                    raise ValueError(f"资源清单缺少字段 {missing}：{path}")
+                continue
             resource = _parse_manifest(value, path)
             if resource.resource_id in resources:
                 raise ValueError(f"资源 ID 重复：{resource.resource_id}")

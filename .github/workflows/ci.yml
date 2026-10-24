@@ -25,3 +25,9 @@ jobs:
           python -m compileall -q warden tests examples
           pytest
           python -m build
+      - name: Upload distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: warden-kernel-dist
+          path: dist/*
+          if-no-files-found: error

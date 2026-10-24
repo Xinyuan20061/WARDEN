@@ -1,5 +1,6 @@
 """WARDEN：多智能体有害交互的因果审计与可控防御内核。"""
 
+from warden.core.domain.datasets import InteractionDataset, LabeledInteraction
 from warden.core.domain.enums import AuditMode, EventKind, ResourceState, RunStatus
 from warden.core.domain.models import (
     ActivationCoordinate,
@@ -30,6 +31,8 @@ __all__ = [
     "EventKind",
     "InterventionPlan",
     "InterventionTarget",
+    "InteractionDataset",
+    "LabeledInteraction",
     "ResourceState",
     "ResourceManifest",
     "RiskScore",
@@ -37,4 +40,4 @@ __all__ = [
     "ThreatContract",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

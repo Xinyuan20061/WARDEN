@@ -1,0 +1,81 @@
+{
+  "schema_version": "warden.whitebox-probe-experiment/1",
+  "experiment_id": "qwen25-1.5b-multi-agent-probe-v1",
+  "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+  "model": {
+    "model_path": "../../models_cache/Qwen2.5-1.5B-Instruct",
+    "tokenizer_path": null,
+    "revision": null,
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "local_files_only": true,
+    "use_safetensors": true,
+    "parameter_gradients": false,
+    "quantization": "none",
+    "bnb_4bit_compute_dtype": "bfloat16",
+    "bnb_4bit_quant_type": "nf4",
+    "bnb_4bit_use_double_quant": true
+  },
+  "dataset_path": "../../experiments/whitebox/interactions.jsonl",
+  "output_directory": "../../experiments/whitebox/output/qwen25-1.5b",
+  "agent_ids": [
+    "sender",
+    "receiver"
+  ],
+  "capture_targets": [
+    {
+      "target_id": "resid-post-layer-04",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 4,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    },
+    {
+      "target_id": "resid-post-layer-08",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 8,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    },
+    {
+      "target_id": "resid-post-layer-12",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 12,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    },
+    {
+      "target_id": "resid-post-layer-16",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 16,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    },
+    {
+      "target_id": "resid-post-layer-20",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 20,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    },
+    {
+      "target_id": "resid-post-layer-24",
+      "agent_ids": ["sender", "receiver"],
+      "layer": 24,
+      "component": "resid_post",
+      "token_policy": "last_token",
+      "retain_gradient": false
+    }
+  ],
+  "probe": {
+    "c": 1.0,
+    "max_iter": 3000,
+    "random_seed": 20261023
+  }
+}

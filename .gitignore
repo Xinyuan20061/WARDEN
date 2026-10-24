@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 .pytest-tmp*/
 .ruff_cache/
+.uv-cache/
+.uv-tools/
 .tmp-*/
 .build-tmp*/
 .wheel-smoke/
@@ -33,3 +35,7 @@ artifacts/runs/
 experiments/
 results/
 .warden/
+
+# Hugging Face 与其他本地模型快照只保存在运行机器。
+models_cache/*
+!models_cache/README.md
