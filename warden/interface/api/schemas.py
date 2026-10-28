@@ -43,6 +43,8 @@ class AuditRequestSchema(BaseModel):
     sae_id: str | None = None
     capture_targets: list[CaptureTargetSchema] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    research_protocol_ref: str | None = Field(default=None, min_length=1)
+    study_arm_ref: str | None = Field(default=None, min_length=1)
 
     def to_domain(self) -> AuditRequest:
         """转换为核心请求对象。"""
@@ -57,6 +59,8 @@ class AuditRequestSchema(BaseModel):
             sae_id=self.sae_id,
             capture_targets=tuple(item.to_domain() for item in self.capture_targets),
             metadata=self.metadata,
+            research_protocol_ref=self.research_protocol_ref,
+            study_arm_ref=self.study_arm_ref,
         )
 
 

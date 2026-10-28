@@ -27,10 +27,13 @@ class AuditPlanCompiler:
         contract: ThreatContract,
         *,
         components: Sequence[CapabilityReport],
+        research_stages: Sequence[str] | None = None,
     ) -> AuditPlan:
         """生成计划；缺失项写入 blockers，不以假数据继续执行。"""
 
         blockers: list[str] = []
+        if request.research_protocol_ref is not None and research_stages is None:
+            blockers.append("研究协议与实验臂未在服务端 allowlist 注册")
         required = self._required_capabilities(request.mode)
         available = {
             capability
@@ -61,7 +64,7 @@ class AuditPlanCompiler:
             request=request,
             threat_contract=contract,
             required_capabilities=required,
-            stages=tuple(stages),
+            stages=tuple(research_stages) if research_stages is not None else tuple(stages),
             status=RunStatus.BLOCKED if blockers else RunStatus.PLANNED,
             blockers=tuple(blockers),
         )

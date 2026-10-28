@@ -39,6 +39,12 @@ interface composition ----> infrastructure
 - Probe 数据必须按案例家族固定为 train/validation/test，反事实条件不得跨切分。
 - GPU Activation 采集与 CPU Probe 训练分阶段执行；重复实验应复用带哈希的 Corpus。
 - 单主体和联合主体 Probe 必须共享样本行顺序，并在清单中记录联合拼接顺序。
+- M 机制重放与 S 实际通信分别记录；decoded_directive、secret_bit 和 misaligned 不得混用。
+- LEACE 复用固定的 concept-erasure，不以 Probe 方向平移替代；只在 train 拟合。
+- 精确 token 干预不能使用 mean_tokens 拟合坐标；head patch 无后端支持时明确拒绝。
+- 基础库源码默认只读；gitlink 升级必须先完成历史与新版数据回归。
+- 研究阶段复用 PipelineAuditExecutor；SQLite 队列只作显式单 worker 消费。
+- 中断后副作用未知的任务保留 ambiguous 信息，禁止自动重试。
 
 ## 外部接口
 
@@ -46,6 +52,8 @@ interface composition ----> infrastructure
 - 原始 activation 不进入普通 JSON；API 只返回 `ArtifactRef` 和统计摘要。
 - 所有公开 Schema 必须版本化，新增字段默认保持向后兼容。
 - 长任务通过 run ID 和状态查询表达，不在 HTTP 请求中阻塞执行完整实验。
+- 研究协议与实验臂使用服务端引用白名单；禁止透传任意客户端 JSON 为执行参数。
+- 研究写入要求操作者令牌。公共投影不含真值、本地 URI 或未审批工件。
 
 ## 代码规范
 

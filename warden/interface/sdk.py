@@ -12,16 +12,19 @@ from urllib.request import Request, urlopen
 class WardenClient:
     """调用 WARDEN `/v1` API 的轻量同步客户端。"""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8765", *, timeout: float = 30.0) -> None:
+    def __init__(self, base_url: str = "http://127.0.0.1:8765", *, timeout: float = 30.0,
+                 token: str | None = None) -> None:
         """初始化客户端。
 
         参数：
             base_url: WARDEN API 根地址，不包含 `/v1`。
             timeout: 单次 HTTP 请求超时秒数。
+            token: 可选研究操作者令牌；不写入 payload 或日志。
         """
 
         self.base_url = base_url.rstrip("/")
         self.timeout = float(timeout)
+        self._token = token
 
     def health(self) -> Mapping[str, Any]:
         """读取服务版本和存活状态。"""
@@ -78,11 +81,14 @@ class WardenClient:
         """发送 JSON 请求并把 HTTP 错误转换成包含响应正文的异常。"""
 
         body = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
         request = Request(
             self.base_url + path,
             data=body,
             method=method,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers=headers,
         )
         try:
             with urlopen(request, timeout=self.timeout) as response:

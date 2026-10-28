@@ -1,0 +1,3 @@
+# concept-erasure 0.2.4，MIT；仅固定算法包，PyTorch 由部署环境选择 CPU/CUDA。
+# 安装：pip install --no-deps --require-hashes -r requirements/research-lock.txt
+concept-erasure==0.2.4 --hash=sha256:a7665b49d97c6aa3bfd504ca724ef460bb61237aa510ae31e9550de8619806af

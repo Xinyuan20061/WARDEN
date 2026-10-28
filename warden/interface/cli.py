@@ -77,7 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise RuntimeError("启动 API 需要安装 warden-kernel[api]") from exc
         from warden.interface.api.app import create_app
 
-        uvicorn.run(create_app(service), host=args.host, port=args.port)
+        uvicorn.run(create_app(service, research_token=os.getenv("WARDEN_RESEARCH_TOKEN")),
+                    host=args.host, port=args.port)
         return 0
     if args.command in {"whitebox-preflight", "whitebox-run"}:
         from warden.infrastructure.workflows import (

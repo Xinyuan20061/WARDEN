@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
@@ -80,12 +81,21 @@ class FileArtifactRepository:
         """通过工件标识打开已登记内容。"""
 
         kind, separator, prefix = artifact_id.rpartition("-")
-        if not separator or len(prefix) != 64:
+        if not separator or not re.fullmatch(r"[a-z0-9-]+", kind) or not re.fullmatch(
+            r"[a-f0-9]{64}", prefix
+        ):
             raise ValueError("artifact_id 格式无效")
         payload = self.root / kind / prefix[:2] / f"{prefix}.bin"
         if not payload.is_file():
             raise FileNotFoundError(f"找不到工件：{artifact_id}")
-        return payload.open("rb")
+        if not payload.resolve().is_relative_to(self.root):
+            raise ValueError("工件路径超出允许根目录")
+        handle = payload.open("rb")
+        if sha256(handle.read()).hexdigest() != prefix:
+            handle.close()
+            raise ValueError("工件内容哈希不匹配")
+        handle.seek(0)
+        return handle
 
 
 def _safe_kind(value: str) -> str:

@@ -209,7 +209,10 @@ class ProbeSuiteTrainer:
                     "version": "1",
                     "model_id": corpus.model_id,
                     "tensor_ref": "+".join(stream_ids),
-                    "positive_label": "risk_condition",
+                    "positive_label": corpus.dataset_metadata.get(
+                        "label_semantics", "risk_condition"
+                    ),
+                    "label_provenance": dict(corpus.dataset_metadata),
                     "training_fingerprint": corpus.corpus_id,
                     "dataset_id": corpus.dataset_id,
                     "dataset_fingerprint": corpus.dataset_fingerprint,

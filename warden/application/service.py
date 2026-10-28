@@ -1,6 +1,6 @@
 """供 CLI、REST API 和 Python SDK 共同调用的应用门面。"""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from threading import RLock
 from uuid import uuid4
 
@@ -15,7 +15,7 @@ from warden.core.domain.models import (
     ResourceManifest,
     ThreatContract,
 )
-from warden.core.ports.runs import RunDispatcher
+from warden.core.ports.runs import PersistentPlanStore, RunDispatcher
 from warden.core.ports.threat import ThreatContractSource
 
 
@@ -29,6 +29,7 @@ class WardenService:
         threat_source: ThreatContractSource | None = None,
         components: Sequence[CapabilityReport] = (),
         dispatcher: RunDispatcher | None = None,
+        research_stages: Mapping[tuple[str, str], Sequence[str]] | None = None,
     ) -> None:
         """初始化应用服务。
 
@@ -37,11 +38,20 @@ class WardenService:
             threat_source: 可选威胁契约来源，例如 FRACTAL-Bench 数据集。
             components: Runtime、Activation Backend 等组件能力报告。
             dispatcher: 可选运行调度器，由部署层决定同步、队列或分布式执行。
+            research_stages: 服务端冻结的 (协议引用, 实验臂引用) 到阶段标识白名单。
         """
 
         self.resources = resources or ResourceCatalog()
         self.threat_source = threat_source
         self.dispatcher = dispatcher
+        self._research_stages = {
+            key: tuple(value) for key, value in (research_stages or {}).items()
+        }
+        for key, stages in self._research_stages.items():
+            if (len(key) != 2 or any(not isinstance(x, str) or not x.strip() for x in key)
+                    or not stages or len(set(stages)) != len(stages)
+                    or any(not isinstance(x, str) or not x.strip() for x in stages)):
+                raise ValueError("研究协议/实验臂映射必须包含唯一非空阶段")
         self._components = {item.component_id: item for item in components}
         self._compiler = AuditPlanCompiler(self.resources)
         self._plans: dict[str, AuditPlan] = {}
@@ -78,16 +88,24 @@ class WardenService:
             request,
             resolved,
             components=self.capabilities(),
+            research_stages=self._research_stages.get(
+                (request.research_protocol_ref, request.study_arm_ref)
+            ),
         )
         with self._lock:
             self._plans[plan.plan_id] = plan
+        if isinstance(self.dispatcher, PersistentPlanStore):
+            self.dispatcher.save_plan(plan)
         return plan
 
     def get_plan(self, plan_id: str) -> AuditPlan | None:
         """返回已登记计划；未知标识返回空。"""
 
         with self._lock:
-            return self._plans.get(plan_id)
+            plan = self._plans.get(plan_id)
+        if plan is None and isinstance(self.dispatcher, PersistentPlanStore):
+            return self.dispatcher.get_plan(plan_id)
+        return plan
 
     def list_plans(self) -> tuple[AuditPlan, ...]:
         """按创建时间返回计划快照。"""
@@ -110,7 +128,9 @@ class WardenService:
             )
         run = self.dispatcher.submit(plan)
         if run.plan_id != plan_id:
-            raise RuntimeError("RunDispatcher 返回了不属于该计划的任务")
+            original = self.get_plan(run.plan_id)
+            if original is None or original.request != plan.request:
+                raise RuntimeError("RunDispatcher 返回了不属于该请求的任务")
         return run
 
     def get_run(self, run_id: str) -> AuditRun | None:

@@ -48,6 +48,10 @@ Testing Platform / Visualization / Research Client
 
 ## Core Contracts
 
+研究工作流支持 FRACTAL 机制数据的授权视图转换、明确标签语义、LEACE 方法适配和
+单位置 Activation Patching。任务可通过可选 SQLite 调度器持久保存，平台使用原 `/v1`
+资源与操作者令牌访问研究能力。详见 [跨层研究接口](docs/research.md)。
+
 WARDEN 使用以下坐标把外部交互与内部表征连接起来：
 
 ```text
@@ -232,6 +236,8 @@ artifacts/              只提交说明，不提交权重
 - [API Contract](docs/api.md)
 - [Audit Executor](docs/executor.md)
 - [White-box Workflow](docs/whitebox-workflow.md)
+- [Cross-level Research](docs/research.md)
+- [Development Gates](docs/development/RESEARCH_GATES.md)
 - [Artifact Contract](docs/artifacts.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)

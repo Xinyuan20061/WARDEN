@@ -1,7 +1,7 @@
 """审计任务调度端口。"""
 
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from warden.core.domain.models import AuditPlan, AuditRun, EvidenceBundle
 
@@ -27,4 +27,17 @@ class RunDispatcher(Protocol):
 
     def list(self) -> Sequence[AuditRun]:
         """返回调度器已知的任务快照。"""
+        ...
+
+
+@runtime_checkable
+class PersistentPlanStore(Protocol):
+    """可选持久增强能力，不修改原 RunDispatcher 的必需方法。"""
+
+    def save_plan(self, plan: AuditPlan) -> None:
+        """保存可信编译计划。"""
+        ...
+
+    def get_plan(self, plan_id: str) -> AuditPlan | None:
+        """恢复计划；未知标识返回 None。"""
         ...

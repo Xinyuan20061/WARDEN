@@ -1,0 +1,23 @@
+{
+  "schema_version": "warden.whitebox-probe-experiment/1",
+  "experiment_id": "codebook-mechanism-development",
+  "model_id": "local-receiver-model",
+  "model": {
+    "model_path": "../../models_cache/receiver-model",
+    "revision": null,
+    "device": "cuda",
+    "dtype": "bfloat16",
+    "local_files_only": true,
+    "trust_remote_code": false
+  },
+  "dataset_format": "fractal_mechanism",
+  "dataset_path": "../../experiments/codebook/testbed.json",
+  "split_path": "../../experiments/codebook/split_manifest.json",
+  "output_directory": "../../experiments/codebook/whitebox",
+  "agent_ids": ["receiver"],
+  "capture_targets": [
+    {"target_id": "resid-layer-1", "agent_ids": ["receiver"], "layer": 1,
+      "component": "resid_post", "token_policy": "last_token"}
+  ],
+  "probe": {"c": 1.0, "max_iter": 2000, "random_seed": 20261028}
+}

@@ -31,3 +31,22 @@ jobs:
           name: warden-kernel-dist
           path: dist/*
           if-no-files-found: error
+
+  research-methods:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize public runtime
+        run: git submodule update --init --recursive vendor/stegopot
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install CPU method dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e vendor/stegopot
+          pip install -e '.[probe,research,dev]'
+      - name: Verify official LEACE and patch contracts
+        run: |
+          pytest tests/integration/test_leace_and_patching.py tests/integration/test_stegopot_feature_extractor.py

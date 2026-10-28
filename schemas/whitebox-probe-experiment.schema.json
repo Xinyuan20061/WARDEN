@@ -33,6 +33,8 @@
       "type": "string",
       "minLength": 1
     },
+    "dataset_format": {"enum": ["interaction_jsonl", "fractal_mechanism"]},
+    "split_path": {"type": ["string", "null"], "minLength": 1},
     "output_directory": {
       "type": "string",
       "minLength": 1

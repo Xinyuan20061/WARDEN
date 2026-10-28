@@ -180,11 +180,18 @@ class AuditRequest:
     sae_id: str | None = None
     capture_targets: Sequence[CaptureTarget] = field(default_factory=tuple)
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    research_protocol_ref: str | None = None
+    study_arm_ref: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("request_id", "contract_id", "model_id", "runtime_id"):
             object.__setattr__(self, name, _require_text(getattr(self, name), name))
         object.__setattr__(self, "mode", AuditMode(self.mode))
+        if (self.research_protocol_ref is None) != (self.study_arm_ref is None):
+            raise ValueError("research_protocol_ref 与 study_arm_ref 必须同时提供")
+        for name in ("research_protocol_ref", "study_arm_ref"):
+            if getattr(self, name) is not None:
+                object.__setattr__(self, name, _require_text(getattr(self, name), name))
         object.__setattr__(self, "capture_targets", tuple(self.capture_targets))
         object.__setattr__(self, "metadata", _freeze_mapping(self.metadata))
 

@@ -43,6 +43,7 @@ class ActivationCorpus:
     labels: Sequence[int]
     stream_features: Mapping[str, Any] = field(repr=False)
     stream_metadata: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    dataset_metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """固定元数据并校验所有特征流的形状和有限性。"""
@@ -65,6 +66,14 @@ class ActivationCorpus:
             raise ValueError("Corpus 必须同时包含 train、validation 和 test")
         if set(labels) != {0, 1}:
             raise ValueError("Corpus 必须同时包含标签 0 和 1")
+        family_splits: dict[str, str] = {}
+        split_labels = {name: set() for name in ("train", "validation", "test")}
+        for family, split, label in zip(family_ids, splits, labels, strict=True):
+            if family_splits.setdefault(family, split) != split:
+                raise ValueError("Corpus 家族跨切分泄漏")
+            split_labels[split].add(label)
+        if any(values != {0, 1} for values in split_labels.values()):
+            raise ValueError("Corpus 每个切分必须包含正负标签")
         features: dict[str, Any] = {}
         for key, raw_value in self.stream_features.items():
             if not isinstance(key, str) or not key.strip():
@@ -84,6 +93,7 @@ class ActivationCorpus:
         object.__setattr__(self, "family_ids", family_ids)
         object.__setattr__(self, "splits", splits)
         object.__setattr__(self, "labels", labels)
+        object.__setattr__(self, "dataset_metadata", MappingProxyType(dict(self.dataset_metadata)))
         object.__setattr__(self, "stream_features", MappingProxyType(features))
         object.__setattr__(
             self,
@@ -214,6 +224,7 @@ class ActivationCorpusBuilder:
             labels=tuple(item.label for item in samples),
             stream_features=matrices,
             stream_metadata=metadata,
+            dataset_metadata=dataset.metadata,
         )
 
 
@@ -243,6 +254,7 @@ def save_activation_corpus(corpus: ActivationCorpus, destination: Path) -> Path:
         "family_ids": list(corpus.family_ids),
         "splits": list(corpus.splits),
         "labels": list(corpus.labels),
+        "dataset_metadata": dict(corpus.dataset_metadata),
         "streams": {
             key: {
                 "array_name": array_names[key],
@@ -288,6 +300,7 @@ def load_activation_corpus(path: Path) -> ActivationCorpus:
         family_ids=tuple(manifest["family_ids"]),
         splits=tuple(manifest["splits"]),
         labels=tuple(manifest["labels"]),
+        dataset_metadata=manifest.get("dataset_metadata", {}),
         stream_features=features,
         stream_metadata={
             stream: entry.get("metadata", {}) for stream, entry in streams.items()

@@ -9,3 +9,4 @@
 - StegoPot pin 未变，上游源码均未编辑。
 - 回滚：将 FRACTAL gitlink 恢复到 `8081bc61f98cca243034c20951f64522b84ab5fa`。
 - 成本：本地 CPU 回归，无模型推理、无云 GPU。
+- 候选 FRACTAL 全量回归：`python -m pytest -q vendor/fractal-bench/tests --basetemp .pytest-tmp-bench-full`，退出 0，95 项通过。

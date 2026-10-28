@@ -45,6 +45,8 @@ class WhiteBoxProbeExperimentConfig:
         probe_c: Logistic Regression 的 L2 正则倒数。
         probe_max_iter: 单个候选 Probe 的最大优化迭代数。
         random_seed: Probe 训练使用的随机种子。
+        dataset_format: interaction_jsonl 或独立的 fractal_mechanism 合同。
+        split_path: M 轨道官方家族切分清单，普通 JSONL 时无需提供。
     """
 
     schema_version: str
@@ -58,12 +60,18 @@ class WhiteBoxProbeExperimentConfig:
     probe_c: float = 1.0
     probe_max_iter: int = 2000
     random_seed: int = 0
+    dataset_format: str = "interaction_jsonl"
+    split_path: Path | None = None
 
     def __post_init__(self) -> None:
         """校验配置版本、标识、主体和采集位置。"""
 
         if self.schema_version != "warden.whitebox-probe-experiment/1":
             raise ValueError("whitebox probe 配置 schema_version 不受支持")
+        if self.dataset_format not in {"interaction_jsonl", "fractal_mechanism"}:
+            raise ValueError("dataset_format 不受支持")
+        if self.dataset_format == "fractal_mechanism" and self.split_path is None:
+            raise ValueError("MechanismDataset 必须指定官方 split_path")
         for name in ("experiment_id", "model_id"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -120,6 +128,8 @@ def load_whitebox_probe_config(path: Path) -> WhiteBoxProbeExperimentConfig:
         "agent_ids",
         "capture_targets",
         "probe",
+        "dataset_format",
+        "split_path",
     }
     unknown = sorted(set(value) - allowed)
     if unknown:
@@ -151,6 +161,8 @@ def load_whitebox_probe_config(path: Path) -> WhiteBoxProbeExperimentConfig:
         probe_c=float(probe_value.get("c", 1.0)),
         probe_max_iter=int(probe_value.get("max_iter", 2000)),
         random_seed=int(probe_value.get("random_seed", 0)),
+        dataset_format=value.get("dataset_format", "interaction_jsonl"),
+        split_path=_resolve_path(base, value["split_path"]) if value.get("split_path") else None,
     )
 
 
@@ -255,8 +267,8 @@ def preflight_whitebox_probe_experiment(
                 }
             )
     try:
-        dataset = load_interaction_dataset(config.dataset_path)
-    except (FileNotFoundError, TypeError, ValueError) as exc:
+        dataset = _load_dataset(config)
+    except (FileNotFoundError, TypeError, ValueError, RuntimeError) as exc:
         checks.append(
             {
                 "check_id": "dataset.contract",
@@ -326,7 +338,7 @@ def run_whitebox_probe_experiment(
             raise RuntimeError("白盒实验预检未通过：" + "; ".join(reasons))
         if corpus_root.exists():
             raise FileExistsError(f"Activation Corpus 已存在：{corpus_root}")
-        dataset = load_interaction_dataset(config.dataset_path)
+        dataset = _load_dataset(config)
         notify("正在加载本地 Hugging Face 模型")
         runtime = build_huggingface_runtime(config.model)
         extractor = StegoPotActivationFeatureExtractor(
@@ -379,6 +391,15 @@ def _resolve_path(base: Path, value: Any) -> Path:
         raise ValueError("路径字段必须是非空字符串")
     path = Path(value)
     return path.resolve() if path.is_absolute() else (base / path).resolve()
+
+
+def _load_dataset(config: WhiteBoxProbeExperimentConfig):
+    """按显式格式调用独立适配器，不猜测 JSON 字段。"""
+    if config.dataset_format == "fractal_mechanism":
+        from warden.infrastructure.adapters.fractal_mechanism import FractalMechanismDatasetAdapter
+
+        return FractalMechanismDatasetAdapter(config.dataset_path, config.split_path).load()
+    return load_interaction_dataset(config.dataset_path)
 
 
 def _write_json_atomic(payload: Mapping[str, Any], destination: Path) -> None:
