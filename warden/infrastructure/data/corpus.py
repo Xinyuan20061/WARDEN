@@ -13,7 +13,7 @@ from typing import Any
 
 from warden.core.domain.datasets import InteractionDataset
 from warden.core.domain.models import CaptureTarget, to_primitive
-from warden.core.ports.features import ActivationFeatureExtractor
+from warden.core.ports.features import ActivationFeatureExtractor, CanonicalInputValidator
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +159,15 @@ class ActivationCorpusBuilder:
         rows = {key: [] for key in expected_streams}
         samples = tuple(sorted(dataset.samples, key=lambda item: item.sample_id))
         for sample in samples:
+            if dataset.metadata.get("track") == "M":
+                coordinates = dataset.metadata.get("input_coordinates", {})
+                if (not isinstance(self._extractor, CanonicalInputValidator)
+                        or sample.sample_id not in coordinates):
+                    raise ValueError("机制数据尚未经过规范响应渲染与坐标核验，禁止采集")
+                if any(target.token_policy != "last_token" for target in resolved_targets):
+                    raise ValueError("规范机制数据仅支持已验证的 last_token 坐标")
+                for text in sample.inputs_by_agent.values():
+                    self._extractor.validate_canonical_input(text, coordinates[sample.sample_id])
             extracted = self._extractor.extract(
                 sample_id=sample.sample_id,
                 inputs_by_agent=sample.inputs_by_agent,

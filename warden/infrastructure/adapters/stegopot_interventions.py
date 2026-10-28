@@ -6,18 +6,29 @@ from collections.abc import Mapping
 from typing import Any
 
 
-def build_leace_intervention(transform: Any, *, target: Any, model_revision: str) -> Any:
+def build_leace_intervention(transform: Any, *, target: Any, model_revision: str,
+                             prepared_input: Any | None = None) -> Any:
     """将已拟合擦除器绑定到精确位置，返回 StegoPot Intervention。
 
     参数：
         transform: WARDEN LeaceTransform，不转移其所有权。
         target: StegoPot TensorRef；仅支持单 token residual 位置。
         model_revision: 当前模型固定提交，必须匹配拟合来源。
+        prepared_input: 规范机制变换必需的 CanonicalInput；验证响应坐标及分词器版本。
 
     异常：
         ValueError: 模型、token 或位置与训练来源不一致。
     """
     from stegopot.domain.model.intervention_runtime import Intervention
+
+    from warden.infrastructure.adapters.canonical_input import CANONICAL_PROTOCOL, CanonicalInput
+
+    if transform.metadata.get("capture_protocol") == CANONICAL_PROTOCOL:
+        if not isinstance(prepared_input, CanonicalInput):
+            raise ValueError("规范响应干预必须提供经过渲染的 prepared_input")
+        if (prepared_input.tokenizer_revision != transform.metadata.get("tokenizer_revision")
+                or target.token != -1):
+            raise ValueError("规范响应作用点或分词器版本不一致")
 
     if target.head is not None:
         raise ValueError("UNSUPPORTED_HEAD_PATCH")

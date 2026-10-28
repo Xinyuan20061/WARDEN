@@ -10,6 +10,10 @@ from concept_erasure import LeaceEraser  # noqa: E402
 from stegopot.domain.model.intervention_runtime import InterventionContext  # noqa: E402
 from stegopot.domain.model.reference import TensorRef  # noqa: E402
 
+from warden.infrastructure.adapters.canonical_input import (  # noqa: E402
+    CANONICAL_PROTOCOL,
+    CanonicalInput,
+)
 from warden.infrastructure.adapters.stegopot_interventions import (  # noqa: E402
     build_leace_intervention,
     build_paired_patch,
@@ -36,6 +40,14 @@ def test_official_leace_numerics_roundtrip_and_fit_boundary(tmp_path):
         LeaceTransform.fit(x, y, split="test", metadata=metadata)
     with pytest.raises(ValueError, match="不一致"):
         build_leace_intervention(restored, target=ref, model_revision="different")
+    canonical = LeaceTransform(restored.eraser, {**restored.metadata,
+                               "capture_protocol": CANONICAL_PROTOCOL,
+                               "tokenizer_revision": "fixed-tokenizer"})
+    with pytest.raises(ValueError, match="prepared_input"):
+        build_leace_intervention(canonical, target=ref, model_revision="frozen")
+    prepared = CanonicalInput('assistant:{}', (1, 2, 3), "fixed-tokenizer")
+    build_leace_intervention(canonical, target=ref, model_revision="frozen",
+                              prepared_input=prepared)
 
 
 def test_patch_rejects_alignment_and_actually_replaces_value():

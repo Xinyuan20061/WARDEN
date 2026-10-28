@@ -1,7 +1,7 @@
 """模型内部表征批量提取端口。"""
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from warden.core.domain.models import CaptureTarget
 
@@ -26,4 +26,13 @@ class ActivationFeatureExtractor(Protocol):
 
     def close(self) -> None:
         """释放模型、Hook 与加速器资源。"""
+        ...
+
+
+@runtime_checkable
+class CanonicalInputValidator(Protocol):
+    """可选坐标验证能力；不改变旧特征提取器的必需接口。"""
+
+    def validate_canonical_input(self, text: str, coordinate: Mapping[str, Any]) -> None:
+        """验证文本编码与坐标；不一致时抛 ValueError，不运行模型。"""
         ...

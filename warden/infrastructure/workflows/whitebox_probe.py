@@ -182,6 +182,12 @@ def preflight_whitebox_probe_experiment(
     """
 
     checks: list[dict[str, Any]] = []
+    if config.dataset_format == "fractal_mechanism":
+        canonical_ready = bool(config.model.revision) and not config.model.trust_remote_code
+        checks.append({"check_id": "model.canonical_input_contract",
+                       "status": "pass" if canonical_ready else "blocked",
+                       "message": "机制采集固定分词器版本且不执行远程代码"
+                       if canonical_ready else "机制采集要求固定 revision 且关闭 remote code"})
     for package in ("numpy", "sklearn", "torch", "transformers", "stegopot"):
         available = importlib.util.find_spec(package) is not None
         checks.append(
@@ -338,13 +344,26 @@ def run_whitebox_probe_experiment(
             raise RuntimeError("白盒实验预检未通过：" + "; ".join(reasons))
         if corpus_root.exists():
             raise FileExistsError(f"Activation Corpus 已存在：{corpus_root}")
-        dataset = _load_dataset(config)
+        tokenizer = None
+        if config.dataset_format == "fractal_mechanism":
+            if not config.model.revision or config.model.trust_remote_code:
+                raise ValueError("机制采集要求固定 revision 且 trust_remote_code=False")
+            from transformers import AutoTokenizer
+
+            tokenizer = AutoTokenizer.from_pretrained(
+                config.model.tokenizer_path or config.model.model_path,
+                revision=config.model.revision, local_files_only=config.model.local_files_only,
+                trust_remote_code=False,
+            )
+        dataset = _load_dataset(config, tokenizer=tokenizer)
         notify("正在加载本地 Hugging Face 模型")
         runtime = build_huggingface_runtime(config.model)
         extractor = StegoPotActivationFeatureExtractor(
             {agent_id: runtime for agent_id in config.agent_ids},
             model_id=config.model_id,
             own_runtimes=True,
+            input_tokenizer=tokenizer,
+            tokenizer_revision=config.model.revision,
         )
         try:
             notify(f"开始采集 {len(dataset.samples)} 个样本的选择性 Activation")
@@ -393,12 +412,22 @@ def _resolve_path(base: Path, value: Any) -> Path:
     return path.resolve() if path.is_absolute() else (base / path).resolve()
 
 
-def _load_dataset(config: WhiteBoxProbeExperimentConfig):
+def _load_dataset(config: WhiteBoxProbeExperimentConfig, *, tokenizer: Any | None = None):
     """按显式格式调用独立适配器，不猜测 JSON 字段。"""
     if config.dataset_format == "fractal_mechanism":
         from warden.infrastructure.adapters.fractal_mechanism import FractalMechanismDatasetAdapter
 
-        return FractalMechanismDatasetAdapter(config.dataset_path, config.split_path).load()
+        renderer = None
+        if tokenizer is not None:
+            from warden.infrastructure.adapters.canonical_input import render_canonical_input
+
+            def renderer(prompt: str, response: str):
+                return render_canonical_input(
+                    tokenizer, prompt, response, tokenizer_revision=config.model.revision,
+                )
+        return FractalMechanismDatasetAdapter(config.dataset_path, config.split_path).load(
+            input_renderer=renderer
+        )
     return load_interaction_dataset(config.dataset_path)
 
 

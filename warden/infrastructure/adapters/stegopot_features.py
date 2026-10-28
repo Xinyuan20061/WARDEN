@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from hashlib import sha256
 from typing import Any
 
 from warden.core.domain.models import CaptureTarget
@@ -18,6 +19,8 @@ class StegoPotActivationFeatureExtractor:
         *,
         model_id: str | None = None,
         own_runtimes: bool = False,
+        input_tokenizer: Any | None = None,
+        tokenizer_revision: str | None = None,
     ) -> None:
         """初始化提取器。
 
@@ -26,6 +29,8 @@ class StegoPotActivationFeatureExtractor:
                 指向同一个 Runtime，以便在单卡上顺序复用一份模型权重。
             model_id: 可选逻辑模型标识。用于避免把机器相关绝对缓存路径写入工件。
             own_runtimes: `close` 时是否关闭去重后的 Runtime。
+            input_tokenizer: 规范聊天输入的已固定分词器；提供时不再由 Runtime 隐式编码。
+            tokenizer_revision: 与 input_tokenizer 一起提供的分词器固定版本。
         """
 
         if not runtimes:
@@ -33,6 +38,10 @@ class StegoPotActivationFeatureExtractor:
         self._runtimes = dict(runtimes)
         self._own_runtimes = bool(own_runtimes)
         self._closed = False
+        self._input_tokenizer = input_tokenizer
+        self._tokenizer_revision = tokenizer_revision
+        if input_tokenizer is not None and not tokenizer_revision:
+            raise ValueError("规范输入分词器必须固定 tokenizer_revision")
         model_ids = {self._runtime_model_id(runtime) for runtime in self._runtimes.values()}
         if len(model_ids) != 1:
             raise ValueError("同一 Activation Corpus 的 Agent 必须使用相同模型权重")
@@ -45,6 +54,23 @@ class StegoPotActivationFeatureExtractor:
         """返回共享模型标识。"""
 
         return self._model_id
+
+    def validate_canonical_input(self, text: str, coordinate: Mapping[str, Any]) -> None:
+        """核对 text 的精确编码与上游坐标；不一致时抛 ValueError。"""
+        from warden.infrastructure.adapters.canonical_input import (
+            CANONICAL_PROTOCOL,
+            encode_canonical_text,
+        )
+
+        if self._input_tokenizer is None:
+            raise ValueError("机制采集需要显式规范输入分词器")
+        ids = encode_canonical_text(self._input_tokenizer, text)
+        expected = {"protocol": CANONICAL_PROTOCOL,
+                    "tokenizer_revision": self._tokenizer_revision,
+                    "token_index": len(ids) - 1, "token_count": len(ids),
+                    "token_id": ids[-1], "input_sha256": sha256(text.encode()).hexdigest()}
+        if dict(coordinate) != expected:
+            raise ValueError("规范输入与 token 坐标、分词器版本或哈希不一致")
 
     def extract(
         self,
@@ -83,10 +109,17 @@ class StegoPotActivationFeatureExtractor:
                 )
                 refs_by_key.setdefault(ref.key, ref)
                 target_refs[target.target_id] = ref
+            payload = inputs_by_agent[agent_id]
+            input_format = "text"
+            if self._input_tokenizer is not None:
+                from warden.infrastructure.adapters.canonical_input import encode_canonical_text
+
+                payload = encode_canonical_text(self._input_tokenizer, payload)
+                input_format = "token_ids"
             result = self._runtimes[agent_id].forward(
                 ModelInput(
-                    inputs_by_agent[agent_id],
-                    format="text",
+                    payload,
+                    format=input_format,
                     metadata={"sample_id": sample_id, "agent_id": agent_id},
                 ),
                 policy=TracePolicy(

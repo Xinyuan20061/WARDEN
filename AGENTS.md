@@ -42,6 +42,8 @@ interface composition ----> infrastructure
 - M 机制重放与 S 实际通信分别记录；decoded_directive、secret_bit 和 misaligned 不得混用。
 - LEACE 复用固定的 concept-erasure，不以 Probe 方向平移替代；只在 train 拟合。
 - 精确 token 干预不能使用 mean_tokens 拟合坐标；head patch 无后端支持时明确拒绝。
+- M 采集必须分离 user 与 assistant 固定响应，并验证真实末内容 token；裸 last_token 不代表语义坐标。
+- 前向数值比较保存原始 logits 与内容哈希，指标必须可从工件独立复算。
 - 基础库源码默认只读；gitlink 升级必须先完成历史与新版数据回归。
 - 研究阶段复用 PipelineAuditExecutor；SQLite 队列只作显式单 worker 消费。
 - 中断后副作用未知的任务保留 ambiguous 信息，禁止自动重试。

@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,10 +15,13 @@ from fractal_bench.storage import (  # noqa: E402
 )
 from fractal_bench.testbeds.codebook_binding import CodebookBindingGenerator  # noqa: E402
 
+from warden.core.domain.models import CaptureTarget  # noqa: E402
+from warden.infrastructure.adapters.canonical_input import CanonicalInput  # noqa: E402
 from warden.infrastructure.adapters.fractal_mechanism import (  # noqa: E402
     FractalMechanismDatasetAdapter,
     receiver_input,
 )
+from warden.infrastructure.data.corpus import ActivationCorpusBuilder  # noqa: E402
 
 
 def test_official_mechanism_import_preserves_labels_and_split(tmp_path):
@@ -29,6 +33,20 @@ def test_official_mechanism_import_preserves_labels_and_split(tmp_path):
     imported = FractalMechanismDatasetAdapter(path, split_path).load()
     assert len(imported.samples) == 24
     assert imported.metadata["label_semantics"] == "decoded_directive"
+    with pytest.raises(ValueError, match="规范响应"):
+        ActivationCorpusBuilder(SimpleNamespace(model_id="fake")).build(
+            imported, (CaptureTarget("ref", ("receiver",), layer=0),)
+        )
+
+    def renderer(prompt, response):
+        assert response not in prompt
+        text = "USER:" + prompt + "\nASSISTANT:" + response
+        return CanonicalInput(text, tuple(text.encode()), "fixed-tokenizer")
+
+    rendered = FractalMechanismDatasetAdapter(path, split_path).load(input_renderer=renderer)
+    coordinates = rendered.metadata["input_coordinates"]
+    assert len(coordinates) == 24
+    assert all(value["token_id"] == ord("}") for value in coordinates.values())
     for sample, condition in zip(imported.samples, dataset.conditions, strict=True):
         assert sample.label == (condition.derived_labels["decoded_directive"] == "SELECT_ALTERNATE")
         text = sample.inputs_by_agent["receiver"]

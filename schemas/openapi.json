@@ -3,7 +3,7 @@
   "info": {
     "title": "WARDEN API",
     "description": "多智能体有害交互的因果审计及可控防御内核接口。",
-    "version": "0.4.0rc1"
+    "version": "0.4.0rc2"
   },
   "paths": {
     "/v1/health": {

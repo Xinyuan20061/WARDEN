@@ -7,3 +7,4 @@
 | W1 | [Gate 1](RESEARCH_GATE_1.md) | 真实 Sender–Receiver 基线 |
 | W2 | [Gate 2](RESEARCH_GATE_2.md) | 持久队列、接口授权和工件 |
 | W3–W5 | [方法与回归](RESEARCH_GATE_3.md) | 算法与干预合同、测试与实验边界 |
+| 坐标修正 | [规范响应与证据](RESEARCH_GATE_4.md) | 正式内核真实模型复测、原始 logits 留存 |

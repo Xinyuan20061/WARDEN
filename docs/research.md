@@ -23,11 +23,34 @@ dataset = FractalMechanismDatasetAdapter(
 ).load()
 ```
 
+不提供渲染器的 `load()` 返回结构预检视图，不能直接送入 ActivationCorpusBuilder。
+实际模型采集必须分离 user 上下文和 assistant 固定响应：
+
+```python
+from transformers import AutoTokenizer
+from warden.infrastructure.adapters.canonical_input import render_canonical_input
+
+revision = "已核验的模型及分词器提交哈希"
+tokenizer = AutoTokenizer.from_pretrained("本地模型路径", local_files_only=True)
+dataset = FractalMechanismDatasetAdapter(
+    Path("experiments/codebook/testbed.json"),
+    Path("experiments/codebook/split_manifest.json"),
+).load(input_renderer=lambda prompt, response: render_canonical_input(
+    tokenizer, prompt, response, tokenizer_revision=revision,
+))
+```
+
+采集器须注入相同 `input_tokenizer` 和 `tokenizer_revision`。它使用
+`add_special_tokens=False` 编码，再通过 StegoPot 的 token_ids 输入执行前向。
+Corpus 构建前逐条核验坐标、token ID、序列长度、输入 SHA 与分词器版本。
+每条坐标随数据来源元数据写入 Corpus，未核验的 M 数据明确拒绝采集。
+
 使用原 CLI 时，在白盒配置中设置
 `dataset_format: "fractal_mechanism"`、`dataset_path` 与 `split_path`；
 其余字段沿用白盒工作流。`agent_ids` 为 `["receiver"]`。官方验证器先检查
 配对关系和 split SHA，再转换授权上下文。derived_labels 不参与 prompt 构造。
 Corpus 和 Probe 清单记录标签语义、来源、数据与切分哈希。
+CLI 的 M 采集必须设置真实的 `model.revision` 且关闭 remote code；CLI 自动执行上述渲染。
 
 ## 方法组合
 
@@ -41,6 +64,13 @@ Corpus 和 Probe 清单记录标签语义、来源、数据与切分哈希。
 LEACE 通过 `build_leace_intervention` 转换成 StegoPot Intervention。首轮作用于
 单层 residual 的末 token，拟合元数据中的 tensor_ref 必须与目标完全一致。
 目标擦除、表面擦除与 Probe 方向平移是不同方法，分别命名并留工件。
+规范变换拟合清单须保存 `capture_protocol` 和 `tokenizer_revision`；构造规范 LEACE
+干预还必须传入 `prepared_input=render_canonical_input(...)` 的结果，避免将裸 `-1`
+误解释为经过验证的响应坐标。
+
+前向数值证据使用 `storage.forward_evidence.save_forward_evidence` 保存 before、
+各处理方法和 replay 的完整词表 logits。`compare_forward_evidence` 从工件重新验证
+SHA 并复算 L2 与重放相等性。此类二进制工件不通过公共摘要网关暴露。
 
 LEACE 依赖安装：
 
