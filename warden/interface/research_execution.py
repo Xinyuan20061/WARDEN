@@ -36,6 +36,17 @@ def configure_research(path: Path, artifact_root: Path):
     for entry in registry["protocols"]:
         if set(entry) != {"protocol_ref", "arm_ref", "config", "phase"}:
             raise ValueError("协议注册包含未知或缺失字段")
+        if entry["phase"] == "live":
+            from warden.interface.live_research import configure_live_entry
+
+            stage, key, live_reports, contract = configure_live_entry(entry, source, artifact_root)
+            if key in mapping:
+                raise ValueError("协议与实验臂引用重复")
+            stages.append(stage)
+            mapping[key] = (stage.stage_id,)
+            reports.extend(live_reports)
+            contracts[contract.contract_id] = contract
+            continue
         if entry["phase"] not in {"collect", "all"}:
             raise ValueError("研究执行只支持 collect 或 all")
         config_path = (source.parent / entry["config"]).resolve()

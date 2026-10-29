@@ -1,6 +1,7 @@
 """分阶段审计执行器测试。"""
 
 from warden.application.executor import (
+    AuditStageFailure,
     CallableAuditStage,
     PipelineAuditExecutor,
     StageResult,
@@ -148,6 +149,22 @@ def test_pipeline_preserves_partial_evidence_on_stage_failure() -> None:
     assert evidence.findings[1]["kind"] == "stage_error"
     assert evidence.findings[1]["stage_id"] == "probe_detection"
     assert "probe incompatible" in evidence.limitations[0]
+
+
+def test_failed_stage_retains_its_public_artifacts_without_becoming_completed() -> None:
+    """真实试验部分失败的事件工件仍可从失败 Run 读取。"""
+    artifact = ArtifactRef(
+        "public-summary-" + "a" * 64, "public-summary", "file:///retained", "a" * 64
+    )
+
+    def fail(context):
+        raise AuditStageFailure("trial failed", partial_result=StageResult(artifacts=(artifact,)))
+
+    executor = PipelineAuditExecutor((CallableAuditStage("live", fail),))
+    evidence = executor.execute(_plan("live"), run_id="failed-live")
+    assert evidence.status is RunStatus.FAILED
+    assert evidence.artifacts == (artifact,)
+    assert evidence.findings[0]["kind"] == "stage_error"
 
 
 def test_pipeline_rejects_duplicate_plan_stages_before_execution() -> None:

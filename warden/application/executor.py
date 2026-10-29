@@ -57,6 +57,14 @@ class StageResult:
         object.__setattr__(self, "state_updates", MappingProxyType(updates))
 
 
+class AuditStageFailure(RuntimeError):
+    """已产生部分证据的失败阶段；保留工件，但不把阶段标成成功。"""
+
+    def __init__(self, message: str, *, partial_result: StageResult) -> None:
+        super().__init__(message)
+        self.partial_result = partial_result
+
+
 class AuditExecutionContext:
     """在同一任务的各阶段之间传递临时状态和累积证据。"""
 
@@ -124,6 +132,9 @@ class AuditExecutionContext:
     def _record_failure(self, stage_id: str, error: Exception) -> None:
         """保留失败阶段和已完成证据，不把失败当作阴性结果。"""
 
+        if isinstance(error, AuditStageFailure):
+            self._artifacts.extend(error.partial_result.artifacts)
+            self._limitations.extend(error.partial_result.limitations)
         self._findings.append(
             MappingProxyType(
                 {
