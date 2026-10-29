@@ -49,8 +49,38 @@ def build_default_service(project_root: Path | None = None) -> WardenService:
     if dataset_path:
         threat_source = FractalDatasetThreatSource(Path(dataset_path))
         components.append(threat_source.capabilities())
+    dispatcher = None
+    research_stages = {}
+    database = os.getenv("WARDEN_RUN_DB")
+    execution_config = os.getenv("WARDEN_EXECUTION_CONFIG")
+    if execution_config and not database:
+        raise ValueError("配置研究执行器时必须设置 WARDEN_RUN_DB")
+    if database:
+        from warden.infrastructure.execution.sqlite import SQLiteRunDispatcher
+
+        executor = None
+        if execution_config:
+            from warden.interface.research_execution import configure_research
+
+            executor, research_stages, execution_reports, contracts = configure_research(
+                Path(execution_config),
+                Path(os.getenv("WARDEN_ARTIFACT_ROOT", root / "artifacts" / "research")),
+            )
+            components.extend(execution_reports)
+            from warden.infrastructure.adapters.research_contracts import ResearchContractSource
+
+            threat_source = ResearchContractSource(contracts, threat_source)
+            components.append(CapabilityReport("artifact.reader", True,
+                                               ("artifact_content_read",)))
+        dispatcher = SQLiteRunDispatcher(Path(database), executor)
+        components.append(CapabilityReport(
+            "run.dispatcher", True,
+            ("persistent_run", "durable_run_state", "idempotent_submission"),
+        ))
     return WardenService(
         resources=resources,
         threat_source=threat_source,
         components=components,
+        dispatcher=dispatcher,
+        research_stages=research_stages,
     )

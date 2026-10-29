@@ -33,9 +33,20 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
     except ImportError as exc:
         raise RuntimeError("创建 REST API 需要安装 warden-kernel[api]") from exc
     if service is None:
+        import os
+        from pathlib import Path
+
         from warden.interface.factory import build_default_service
 
         service = build_default_service()
+        research_token = research_token or os.getenv("WARDEN_RESEARCH_TOKEN")
+        if service.dispatcher is not None and os.getenv("WARDEN_EXECUTION_CONFIG"):
+            from warden.interface.research_execution import public_artifact_reader
+
+            artifact_reader = artifact_reader or public_artifact_reader(
+                service.dispatcher,
+                Path(os.getenv("WARDEN_ARTIFACT_ROOT", Path.cwd() / "artifacts" / "research")),
+            )
     app = FastAPI(
         title="WARDEN API",
         version=__version__,
@@ -48,6 +59,18 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
             raise HTTPException(status_code=403, detail="研究写接口未启用")
         if not authorization or not compare_digest(authorization, f"Bearer {research_token}"):
             raise HTTPException(status_code=401, detail="研究操作未授权")
+
+    def project_run(item):
+        """公开稳定状态原因，不泄露模型路径、提示词或原始异常。"""
+        value = public_projection(item)
+        if item.status.value == "failed":
+            ambiguous = item.metadata.get("phase") == "ambiguous"
+            value["failure"] = {
+                "code": "EXECUTION_AMBIGUOUS" if ambiguous else "EXECUTOR_FAILED",
+                "message": ("Worker 已中断，副作用未知；需要操作者对账，禁止自动重试"
+                            if ambiguous else "执行阶段失败；请按任务 ID 查阅受限 Worker 日志"),
+            }
+        return value
 
     @app.get("/v1/health")
     def health() -> dict[str, Any]:
@@ -116,13 +139,13 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
             if isinstance(exc, IdempotencyConflict):
                 raise HTTPException(status_code=409, detail="request_id 正文冲突") from exc
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return public_projection(run)
+        return project_run(run)
 
     @app.get("/v1/runs")
     def runs():
         """返回当前进程可见的任务快照。"""
 
-        return [public_projection(item) for item in service.list_runs()]
+        return [project_run(item) for item in service.list_runs()]
 
     @app.get("/v1/runs/{run_id}")
     def run(run_id: str):
@@ -131,9 +154,11 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
         item = service.get_run(run_id)
         if item is None:
             raise HTTPException(status_code=404, detail="找不到审计任务")
-        return public_projection(item)
+        return project_run(item)
 
-    @app.get("/v1/artifacts/{artifact_id}/content")
+    @app.get("/v1/artifacts/{artifact_id}/content", response_class=Response,
+             responses={200: {"content": {"application/octet-stream": {
+                 "schema": {"type": "string", "format": "binary"}}}}})
     def artifact_content(artifact_id: str, authorization: str | None = Header(default=None)):
         """经操作者授权读取白名单公共摘要；不接受路径或 URI。"""
         authorize_research(authorization)

@@ -30,6 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve = commands.add_parser("serve", help="启动供测试平台调用的 REST API")
     serve.add_argument("--host", default=os.getenv("WARDEN_HOST", "127.0.0.1"))
     serve.add_argument("--port", type=int, default=int(os.getenv("WARDEN_PORT", "8765")))
+    worker = commands.add_parser("worker", help="消费持久队列；必须显式配置研究执行器")
+    worker.add_argument("--once", action="store_true")
+    worker.add_argument("--poll-seconds", type=float, default=1.0)
     whitebox_preflight = commands.add_parser(
         "whitebox-preflight",
         help="不加载模型地检查白盒 Probe 实验配置",
@@ -54,6 +57,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = build_parser().parse_args(argv)
     service = build_default_service(_project_root())
+    if args.command == "worker":
+        from warden.infrastructure.execution.sqlite import SQLiteRunDispatcher
+        from warden.interface.worker import consume
+
+        if not isinstance(service.dispatcher, SQLiteRunDispatcher):
+            raise RuntimeError("Worker 必须配置 WARDEN_RUN_DB")
+        return consume(service.dispatcher, once=args.once, poll_seconds=args.poll_seconds)
     if args.command == "doctor":
         payload = {
             "version": __version__,
@@ -77,7 +87,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise RuntimeError("启动 API 需要安装 warden-kernel[api]") from exc
         from warden.interface.api.app import create_app
 
-        uvicorn.run(create_app(service, research_token=os.getenv("WARDEN_RESEARCH_TOKEN")),
+        reader = None
+        if service.dispatcher is not None and os.getenv("WARDEN_EXECUTION_CONFIG"):
+            from warden.interface.research_execution import public_artifact_reader
+
+            reader = public_artifact_reader(service.dispatcher, Path(os.getenv(
+                "WARDEN_ARTIFACT_ROOT", _project_root() / "artifacts" / "research")))
+        uvicorn.run(create_app(service, research_token=os.getenv("WARDEN_RESEARCH_TOKEN"),
+                               artifact_reader=reader),
                     host=args.host, port=args.port)
         return 0
     if args.command in {"whitebox-preflight", "whitebox-run"}:

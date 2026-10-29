@@ -26,6 +26,8 @@ artifacts/sae/**/weights.*
 artifacts/sae/**/checkpoint*
 artifacts/activations/
 artifacts/runs/
+artifacts/stegopot-runs/
+artifacts/warden/
 *.pt
 *.pth
 *.safetensors

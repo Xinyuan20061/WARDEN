@@ -15,7 +15,12 @@ from warden.core.domain.models import (
     ResourceManifest,
     ThreatContract,
 )
-from warden.core.ports.runs import PersistentPlanStore, RunDispatcher
+from warden.core.ports.runs import (
+    BlockedRunStore,
+    PersistentPlanIndex,
+    PersistentPlanStore,
+    RunDispatcher,
+)
 from warden.core.ports.threat import ThreatContractSource
 
 
@@ -111,7 +116,10 @@ class WardenService:
         """按创建时间返回计划快照。"""
 
         with self._lock:
-            return tuple(sorted(self._plans.values(), key=lambda item: item.created_at))
+            values = dict(self._plans)
+        if isinstance(self.dispatcher, PersistentPlanIndex):
+            values.update({item.plan_id: item for item in self.dispatcher.list_plans()})
+        return tuple(sorted(values.values(), key=lambda item: item.created_at))
 
     def start_run(self, plan_id: str) -> AuditRun:
         """提交已登记计划；不满足执行条件时返回 blocked 快照。"""
@@ -120,6 +128,8 @@ class WardenService:
         if plan is None:
             raise KeyError(f"找不到审计计划：{plan_id}")
         if plan.status is RunStatus.BLOCKED:
+            if isinstance(self.dispatcher, BlockedRunStore):
+                return self.dispatcher.persist_blocked(plan)
             return self._record_blocked_run(plan_id, plan.blockers)
         if self.dispatcher is None:
             return self._record_blocked_run(

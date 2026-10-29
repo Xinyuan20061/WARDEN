@@ -41,6 +41,18 @@ def test_artifact_download_disabled_without_authorized_gateway():
     assert client.get("/v1/artifacts/example/content").status_code == 403
 
 
+def test_binary_artifact_contract_matches_http_response():
+    client = TestClient(create_app(WardenService(), research_token="token",
+                                  artifact_reader=lambda _: b"verified-summary"))
+    operation = client.get("/openapi.json").json()["paths"][
+        "/v1/artifacts/{artifact_id}/content"]["get"]
+    assert set(operation["responses"]["200"]["content"]) == {"application/octet-stream"}
+    response = client.get("/v1/artifacts/example/content",
+                          headers={"Authorization": "Bearer token"})
+    assert response.headers["content-type"] == "application/octet-stream"
+    assert response.content == b"verified-summary"
+
+
 def test_research_run_replay_and_conflict_http_status(tmp_path):
     queue = SQLiteRunDispatcher(tmp_path / "queue.sqlite", None)
     service = WardenService(

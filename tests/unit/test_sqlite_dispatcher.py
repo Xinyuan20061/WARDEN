@@ -39,6 +39,7 @@ def test_concurrent_replay_only_enqueues_once_and_body_conflict(tmp_path):
     assert terminal.status is RunStatus.COMPLETED
     assert queue.run_next() is None
     assert SQLiteRunDispatcher(path, _Executor()).get(terminal.run_id) == terminal
+    assert SQLiteRunDispatcher(path, _Executor()).list_plans() == (_plan(),)
 
 
 def test_new_process_can_query_plan_and_queued_run(tmp_path):
@@ -72,3 +73,14 @@ def test_interrupted_side_effect_is_not_automatically_retried(tmp_path):
     assert reconciled.status is RunStatus.FAILED
     assert reconciled.metadata["phase"] == "ambiguous"
     assert restarted.submit(_plan()).run_id == run.run_id
+
+
+def test_blocked_run_is_durable_idempotent_and_never_consumed(tmp_path):
+    path = tmp_path / "blocked.sqlite"
+    plan = replace(_plan(), status=RunStatus.BLOCKED, blockers=("模型不可用",))
+    queue = SQLiteRunDispatcher(path, None)
+    first = queue.persist_blocked(plan)
+    restarted = SQLiteRunDispatcher(path, None)
+    assert restarted.persist_blocked(plan).run_id == first.run_id
+    assert restarted.get(first.run_id).blockers == ("模型不可用",)
+    assert restarted.run_next() is None

@@ -41,3 +41,20 @@ class PersistentPlanStore(Protocol):
     def get_plan(self, plan_id: str) -> AuditPlan | None:
         """恢复计划；未知标识返回 None。"""
         ...
+
+@runtime_checkable
+class PersistentPlanIndex(Protocol):
+    """可选的跨进程计划索引，保留旧存储实现兼容性。"""
+
+    def list_plans(self) -> Sequence[AuditPlan]:
+        """列举重启后仍可见的计划。"""
+        ...
+
+
+@runtime_checkable
+class BlockedRunStore(Protocol):
+    """可选的阻塞任务持久化能力。"""
+
+    def persist_blocked(self, plan: AuditPlan) -> AuditRun:
+        """登记幂等阻塞快照，不执行模型。"""
+        ...

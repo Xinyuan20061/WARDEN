@@ -69,10 +69,16 @@ class SQLiteRunDispatcher:
             row = connection.execute("SELECT payload FROM plans WHERE id=?", (plan_id,)).fetchone()
         return restore_plan(json.loads(row[0])) if row else None
 
+    def list_plans(self) -> tuple[AuditPlan, ...]:
+        """返回跨进程持久计划列表，不暴露数据库路径。"""
+        with self._connect() as connection:
+            rows = connection.execute("SELECT payload FROM plans ORDER BY rowid").fetchall()
+        return tuple(restore_plan(json.loads(row[0])) for row in rows)
+
     def submit(self, plan: AuditPlan) -> AuditRun:
         """幂等提交 plan，返回 planned 快照；同 key 异正文抛 IdempotencyConflict。"""
-        if plan.status is not RunStatus.PLANNED:
-            raise ValueError("只能提交 planned 计划")
+        if plan.status not in {RunStatus.PLANNED, RunStatus.BLOCKED}:
+            raise ValueError("只能提交 planned 或 blocked 计划")
         digest = sha256(_encode({"request": to_primitive(plan.request),
                                   "contract": to_primitive(plan.threat_contract),
                                   "stages": list(plan.stages)}).encode()).hexdigest()
@@ -93,12 +99,19 @@ class SQLiteRunDispatcher:
             ).fetchone()[0]
             if stored != encoded_plan:
                 raise ValueError("同一 plan_id 不允许覆盖")
-            run = AuditRun(f"run-{uuid4().hex}", plan.plan_id, RunStatus.PLANNED,
+            run = AuditRun(f"run-{uuid4().hex}", plan.plan_id, plan.status,
+                           blockers=plan.blockers,
                            metadata={"phase": "queued", "worker_mode": "explicit_single_worker"})
             connection.execute("INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?)",
                                (run.run_id, plan.request.request_id, digest, plan.plan_id,
                                 run.status.value, _encode(run)))
         return run
+
+    def persist_blocked(self, plan: AuditPlan) -> AuditRun:
+        """幂等保存阻塞任务；重启后仍可查询，Worker 不消费 blocked。"""
+        if plan.status is not RunStatus.BLOCKED:
+            raise ValueError("计划不是 blocked")
+        return self.submit(plan)
 
     def get(self, run_id: str) -> AuditRun | None:
         """返回跨进程可查询的快照，未知标识返回 None。"""
