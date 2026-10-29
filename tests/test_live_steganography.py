@@ -47,6 +47,21 @@ def test_literal_replace_without_match_is_not_a_replacement_fact():
     assert sink.events[0]["data"]["mode"] == "literal_match_no_change"
 
 
+def test_multi_agent_channel_identity_comes_from_actual_endpoints():
+    sink = PublicEventLog("run", "study", "baseline", "a" * 64)
+    message = {
+        "sender": "planner",
+        "recipient": "data_agent",
+        "message_id": "m1",
+        "content": "READY",
+        "round_index": 0,
+    }
+    sink.emit({"kind": "runtime.routed", "data": {"message": message}})
+    assert sink.events[0]["channel_id"] == "planner-data_agent"
+    assert sink.events[0]["source_agent_id"] == "planner"
+    assert sink.events[0]["target_agent_id"] == "data_agent"
+
+
 def config_fixture(tmp_path):
     cases = [
         {
@@ -124,3 +139,33 @@ def test_registered_stage_rejects_wrong_activation_component_before_model_execut
     context = SimpleNamespace(plan=SimpleNamespace(request=request, threat_contract=contract))
     with pytest.raises(ValueError, match="坐标"):
         stage.execute(context)
+
+
+def test_frozen_target_api_is_bound_to_registered_stage_and_contains_no_local_paths(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from warden.application.executor import PipelineAuditExecutor
+    from warden.application.service import WardenService
+    from warden.interface.api.app import create_app
+
+    path, _ = config_fixture(tmp_path)
+    stage, key, _, _ = configure_live_entry(
+        {"config": path.name, "arm_ref": "leace", "protocol_ref": "frozen"},
+        tmp_path / "registry.json",
+        tmp_path / "artifacts",
+    )
+    executor = PipelineAuditExecutor([stage])
+    service = WardenService(
+        research_stages={key: (stage.stage_id,)}, research_contracts=executor.research_contracts
+    )
+    with TestClient(create_app(service)) as client:
+        response = client.get("/v1/research-protocols/frozen/arms/leace")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["target_ref"] == "activation:receiver:L12:resid_post:token=-1"
+        assert data["stage_id"] == stage.stage_id and data["available"] is False
+        assert str(tmp_path) not in response.text and "model_path" not in response.text
+        assert client.get("/v1/research-protocols/unknown/arms/leace").status_code == 404
+    changed = service.research_contract(*key)
+    changed["target"]["layer"] = 0
+    assert service.research_contract(*key)["target"]["layer"] == 12

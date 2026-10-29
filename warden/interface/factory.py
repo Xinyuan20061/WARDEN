@@ -51,6 +51,7 @@ def build_default_service(project_root: Path | None = None) -> WardenService:
         components.append(threat_source.capabilities())
     dispatcher = None
     research_stages = {}
+    research_contracts = {}
     database = os.getenv("WARDEN_RUN_DB")
     execution_config = os.getenv("WARDEN_EXECUTION_CONFIG")
     if execution_config and not database:
@@ -67,20 +68,24 @@ def build_default_service(project_root: Path | None = None) -> WardenService:
                 Path(os.getenv("WARDEN_ARTIFACT_ROOT", root / "artifacts" / "research")),
             )
             components.extend(execution_reports)
+            research_contracts = executor.research_contracts
             from warden.infrastructure.adapters.research_contracts import ResearchContractSource
 
             threat_source = ResearchContractSource(contracts, threat_source)
-            components.append(CapabilityReport("artifact.reader", True,
-                                               ("artifact_content_read",)))
+            components.append(CapabilityReport("artifact.reader", True, ("artifact_content_read",)))
         dispatcher = SQLiteRunDispatcher(Path(database), executor)
-        components.append(CapabilityReport(
-            "run.dispatcher", True,
-            ("persistent_run", "durable_run_state", "idempotent_submission"),
-        ))
+        components.append(
+            CapabilityReport(
+                "run.dispatcher",
+                True,
+                ("persistent_run", "durable_run_state", "idempotent_submission"),
+            )
+        )
     return WardenService(
         resources=resources,
         threat_source=threat_source,
         components=components,
         dispatcher=dispatcher,
         research_stages=research_stages,
+        research_contracts=research_contracts,
     )

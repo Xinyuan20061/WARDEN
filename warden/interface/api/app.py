@@ -12,8 +12,12 @@ from warden.interface.api.projections import public_projection
 from warden.interface.api.schemas import AuditRequestSchema, RunRequestSchema
 
 
-def create_app(service: WardenService | None = None, *, research_token: str | None = None,
-               artifact_reader: Callable[[str], bytes] | None = None) -> Any:
+def create_app(
+    service: WardenService | None = None,
+    *,
+    research_token: str | None = None,
+    artifact_reader: Callable[[str], bytes] | None = None,
+) -> Any:
     """创建 API 应用；导入模块本身不会要求安装 FastAPI。
 
     参数：
@@ -67,8 +71,11 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
             ambiguous = item.metadata.get("phase") == "ambiguous"
             value["failure"] = {
                 "code": "EXECUTION_AMBIGUOUS" if ambiguous else "EXECUTOR_FAILED",
-                "message": ("Worker 已中断，副作用未知；需要操作者对账，禁止自动重试"
-                            if ambiguous else "执行阶段失败；请按任务 ID 查阅受限 Worker 日志"),
+                "message": (
+                    "Worker 已中断，副作用未知；需要操作者对账，禁止自动重试"
+                    if ambiguous
+                    else "执行阶段失败；请按任务 ID 查阅受限 Worker 日志"
+                ),
             }
         return value
 
@@ -90,6 +97,14 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
 
         return [public_projection(item) for item in service.list_resources(kind=kind)]
 
+    @app.get("/v1/research-protocols/{protocol_ref}/arms/{arm_id}")
+    def execution_contract(protocol_ref: str, arm_id: str):
+        """返回服务端实际阶段的冻结目标；不信任前端预览或调用者自报目标。"""
+        value = service.research_contract(protocol_ref, arm_id)
+        if value is None:
+            raise HTTPException(status_code=404, detail="找不到冻结执行配置")
+        return value
+
     @app.get("/v1/contracts")
     def contracts() -> list[str]:
         """返回当前威胁来源中的契约标识。"""
@@ -97,8 +112,9 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
         return list(service.list_contracts())
 
     @app.post("/v1/audit-plans")
-    def create_audit_plan(request: AuditRequestSchema,
-                          authorization: str | None = Header(default=None)):
+    def create_audit_plan(
+        request: AuditRequestSchema, authorization: str | None = Header(default=None)
+    ):
         """编译审计计划，缺失训练资源时返回 blocked 状态和原因。"""
 
         if request.research_protocol_ref is not None:
@@ -156,9 +172,17 @@ def create_app(service: WardenService | None = None, *, research_token: str | No
             raise HTTPException(status_code=404, detail="找不到审计任务")
         return project_run(item)
 
-    @app.get("/v1/artifacts/{artifact_id}/content", response_class=Response,
-             responses={200: {"content": {"application/octet-stream": {
-                 "schema": {"type": "string", "format": "binary"}}}}})
+    @app.get(
+        "/v1/artifacts/{artifact_id}/content",
+        response_class=Response,
+        responses={
+            200: {
+                "content": {
+                    "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+                }
+            }
+        },
+    )
     def artifact_content(artifact_id: str, authorization: str | None = Header(default=None)):
         """经操作者授权读取白名单公共摘要；不接受路径或 URI。"""
         authorize_research(authorization)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
 from hashlib import sha256
 from importlib.util import find_spec
 from pathlib import Path
@@ -16,26 +15,14 @@ from warden.infrastructure.adapters.live_steganography import (
     load_live_config,
     run_live_experiment,
 )
+from warden.infrastructure.adapters.stego_training_cache import model_content_hashes
 from warden.infrastructure.storage.filesystem import FileArtifactRepository
 from warden.infrastructure.storage.gateway import ArtifactGateway
 
 
-@lru_cache(maxsize=64)
-def _frozen_model_digest(path, size, modified_ns):
-    """缓存按文件状态区分；模型变化会改变阶段标识，不能复用旧计划。"""
-    return digest_file(Path(path))
-
-
 def _model_hashes(model):
-    root = Path(model.model_path)
-    files = [root / "model.safetensors", root / "config.json"]
-    tokenizer = Path(model.tokenizer_path or model.model_path)
-    files.extend(tokenizer / name for name in ("tokenizer.json", "tokenizer_config.json"))
-    return {
-        p.name: _frozen_model_digest(str(p), p.stat().st_size, p.stat().st_mtime_ns)
-        for p in files
-        if p.is_file()
-    }
+    """以完整内容身份覆盖分片和独立 tokenizer，不信任文件时间戳。"""
+    return model_content_hashes(model)
 
 
 def configure_live_entry(entry, source, artifact_root):
@@ -55,6 +42,25 @@ def configure_live_entry(entry, source, artifact_root):
     from warden.infrastructure.adapters import live_steganography
 
     adapter_hash = digest_file(Path(live_steganography.__file__))
+    source_root = Path(live_steganography.__file__).parent
+    code_files = [
+        source_root / name
+        for name in (
+            "stego_diagnostics.py",
+            "stego_readout.py",
+            "stego_training_cache.py",
+            "stegopot_interventions.py",
+            "stegopot_channels.py",
+        )
+    ]
+    code_files += [
+        source_root.parent / "methods" / "probe" / "linear.py",
+        source_root.parent / "methods" / "intervention" / "leace.py",
+    ]
+    code_hashes = {p.relative_to(source_root.parent).as_posix(): digest_file(p) for p in code_files}
+    adapter_hash = sha256(
+        (adapter_hash + json.dumps(code_hashes, sort_keys=True)).encode()
+    ).hexdigest()
     model_hashes = _model_hashes(model)
     stage_id = (
         "live-stego-"
@@ -65,6 +71,7 @@ def configure_live_entry(entry, source, artifact_root):
                 + split_hash
                 + code_hash
                 + adapter_hash
+                + entry["protocol_ref"]
                 + arm
                 + json.dumps(model_hashes, sort_keys=True)
             ).encode()
@@ -78,6 +85,8 @@ def configure_live_entry(entry, source, artifact_root):
     repository = FileArtifactRepository(artifact_root)
 
     def execute(context):
+        if any(digest_file(source_root.parent / p) != value for p, value in code_hashes.items()):
+            raise ValueError("执行期间依赖源码发生变化，拒绝使用旧计划")
         request = context.plan.request
         if (
             request.model_id != config["model_id"]
@@ -127,7 +136,9 @@ def configure_live_entry(entry, source, artifact_root):
         from warden.core.domain.models import to_primitive
 
         manifest = {
-            "schema_version": "warden.research-run/2",
+            "schema_version": "warden.research-run/3"
+            if config["schema_version"] != "warden.live-stego-config/1"
+            else "warden.research-run/2",
             "run_id": context.run_id,
             "plan_id": context.plan.plan_id,
             "study_id": request.metadata.get("study_id"),
@@ -158,6 +169,21 @@ def configure_live_entry(entry, source, artifact_root):
             "limitations": result["limitations"],
             "files_sha256": {p.name: digest_file(p) for p in output.iterdir() if p.is_file()},
         }
+        if manifest["schema_version"] == "warden.research-run/3":
+            manifest.update(
+                protocol_version="controlled-collaborative/3"
+                if config["schema_version"].endswith("/3")
+                else "controlled-collaborative/2",
+                training_input_hashes=result["training_input_hashes"],
+                outcome_schema_version="stego.outcome/2",
+                batch_id=request.metadata.get("batch_id"),
+                replicate_id=request.metadata.get("replicate_id"),
+                method_version="3" if config["schema_version"].endswith("/3") else "2",
+                baseline_validity_gate=config["baseline_validity_gate"],
+                training_inputs=result["training_inputs"],
+                cost=result["cost"],
+                scenario=config["scenario"],
+            )
         # 本地 URI 属于受限实现细节，不放入公共清单。
         manifest["events_artifact"].pop("uri", None)
         manifest_ref = repository.put_bytes(
@@ -199,9 +225,72 @@ def configure_live_entry(entry, source, artifact_root):
     contract = ThreatContract(
         contract_id,
         "controlled-llm-codebook",
-        ("sender", "receiver"),
-        (("sender", "receiver"),),
+        ("planner", "data_agent", "sender", "receiver")
+        if config.get("scenario") == "four_agent_v1"
+        else ("sender", "receiver"),
+        (("planner", "data_agent"), ("data_agent", "sender"), ("sender", "receiver"))
+        if config.get("scenario") == "four_agent_v1"
+        else (("sender", "receiver"),),
         "synthetic_secret_recovery",
         "public_arithmetic",
     )
-    return CallableAuditStage(stage_id, execute), (entry["protocol_ref"], arm), caps, contract
+    target = {"kind": "none"}
+    target_ref = "none"
+    if arm == "agent_isolation":
+        target = {"kind": "agent", "agent_id": "sender"}
+        target_ref = "agent:sender"
+    elif arm.startswith("message_"):
+        target = {"kind": "edge", "source_agent_id": "sender", "target_agent_id": "receiver"}
+        target_ref = "edge:sender->receiver"
+    elif arm != "baseline":
+        actor = "sender" if arm == "irrelevant" else "receiver"
+        target = {
+            "kind": "activation",
+            "agent_id": actor,
+            "layer": config["layer"],
+            "component": "resid_post",
+            "token": -1,
+            "generation_step": 0,
+            "generation_phases": ["sender_encode"]
+            if actor == "sender"
+            else ["secret_decode", "collaborative_task"],
+        }
+        target_ref = f"activation:{actor}:L{config['layer']}:resid_post:token=-1"
+    description = {
+        "schema_version": "warden.execution-contract/1",
+        "protocol_ref": entry["protocol_ref"],
+        "arm_id": arm,
+        "method_id": arm,
+        "method_version": "3"
+        if config["schema_version"].endswith("/3")
+        else "2"
+        if config["schema_version"].endswith("/2")
+        else "1",
+        "stage_id": stage_id,
+        "available": ready,
+        "target_ref": target_ref,
+        "target": target,
+        "config_sha256": config_hash,
+        "dataset_sha256": data_hash,
+        "split_sha256": split_hash,
+        "seed": config["seed"],
+        "model_id": config["model_id"],
+        "model_revision": model.revision,
+        "tokenizer_revision": model.revision,
+        "model_files_sha256": model_hashes,
+        "capture_targets": [
+            {
+                "agent_id": "receiver",
+                "layer": config["layer"],
+                "component": "resid_post",
+                "token_policy": "last_token",
+                "generation_step": 0,
+            }
+        ],
+    }
+    return (
+        CallableAuditStage(stage_id, execute, public_contract=description),
+        (entry["protocol_ref"], arm),
+        caps,
+        contract,
+    )

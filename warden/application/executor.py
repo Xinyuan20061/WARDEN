@@ -187,18 +187,32 @@ class CallableAuditStage:
         self,
         stage_id: str,
         handler: Callable[[AuditExecutionContext], StageResult],
+        *,
+        public_contract: Mapping[str, Any] | None = None,
     ) -> None:
         """初始化函数式阶段。
 
         参数：
             stage_id: 与计划完全一致的阶段标识。
             handler: 接收只读上下文并返回 `StageResult` 的函数。
+            public_contract: 可选脱敏配置，创建时复制，调用方继续拥有原始对象。
+        返回：无；阶段不拥有 handler 内的模型资源。非法标识或非可调用处理器抛出异常。
         """
 
         if not callable(handler):
             raise TypeError("handler 必须可调用")
         self._stage_id = _require_stage_id(stage_id)
         self._handler = handler
+        from copy import deepcopy
+
+        self._public_contract = deepcopy(public_contract)
+
+    @property
+    def public_contract(self):
+        """返回部署者冻结的脱敏描述副本；不转移阶段或模型资源所有权。"""
+        from copy import deepcopy
+
+        return deepcopy(self._public_contract)
 
     @property
     def stage_id(self) -> str:
@@ -240,6 +254,16 @@ class PipelineAuditExecutor:
             raise ValueError("AuditStage.stage_id 不能重复")
         self._stages = dict(zip(identifiers, values, strict=True))
         self._event_publisher = event_publisher
+
+    @property
+    def research_contracts(self):
+        """按协议/实验臂返回阶段创建时冻结的公共配置，不调用模型。"""
+        contracts = {}
+        for stage in self._stages.values():
+            description = getattr(stage, "public_contract", None)
+            if description:
+                contracts[(description["protocol_ref"], description["arm_id"])] = description
+        return contracts
 
     def execute(self, plan: AuditPlan, *, run_id: str) -> EvidenceBundle:
         """执行计划；缺失阶段或运行异常时返回 failed 证据。"""

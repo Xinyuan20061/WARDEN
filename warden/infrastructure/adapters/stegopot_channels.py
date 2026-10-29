@@ -21,3 +21,18 @@ def channel_transform(method: str, *, search: str = "", replacement: str = "") -
     if method == "message_replace":
         return ReplaceChannel(search, replacement)
     raise ValueError("未知信道干预方法")
+
+
+def scoped_channel_transform(
+    method: str, *, source: str, target: str, search="RED", replacement="BLUE"
+) -> Any:
+    """只选择冻结消息边；正文变换仍交给官方 Channel，不改变其他多跳边。"""
+    inner = channel_transform(method, search=search, replacement=replacement)
+
+    class ScopedChannel:
+        def transform(self, message):
+            if message.sender == source and message.recipient == target:
+                return inner.transform(message)
+            return message
+
+    return ScopedChannel()

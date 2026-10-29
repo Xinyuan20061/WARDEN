@@ -35,6 +35,7 @@ class WardenService:
         components: Sequence[CapabilityReport] = (),
         dispatcher: RunDispatcher | None = None,
         research_stages: Mapping[tuple[str, str], Sequence[str]] | None = None,
+        research_contracts: Mapping[tuple[str, str], Mapping] | None = None,
     ) -> None:
         """初始化应用服务。
 
@@ -44,6 +45,7 @@ class WardenService:
             components: Runtime、Activation Backend 等组件能力报告。
             dispatcher: 可选运行调度器，由部署层决定同步、队列或分布式执行。
             research_stages: 服务端冻结的 (协议引用, 实验臂引用) 到阶段标识白名单。
+            research_contracts: 与白名单中阶段绑定的脱敏描述；复制后供只读查询。
         """
 
         self.resources = resources or ResourceCatalog()
@@ -53,15 +55,34 @@ class WardenService:
             key: tuple(value) for key, value in (research_stages or {}).items()
         }
         for key, stages in self._research_stages.items():
-            if (len(key) != 2 or any(not isinstance(x, str) or not x.strip() for x in key)
-                    or not stages or len(set(stages)) != len(stages)
-                    or any(not isinstance(x, str) or not x.strip() for x in stages)):
+            if (
+                len(key) != 2
+                or any(not isinstance(x, str) or not x.strip() for x in key)
+                or not stages
+                or len(set(stages)) != len(stages)
+                or any(not isinstance(x, str) or not x.strip() for x in stages)
+            ):
                 raise ValueError("研究协议/实验臂映射必须包含唯一非空阶段")
         self._components = {item.component_id: item for item in components}
         self._compiler = AuditPlanCompiler(self.resources)
         self._plans: dict[str, AuditPlan] = {}
         self._local_runs: dict[str, AuditRun] = {}
         self._lock = RLock()
+        from copy import deepcopy
+
+        self._research_contracts = deepcopy(dict(research_contracts or {}))
+        if any(
+            key not in self._research_stages
+            or description["stage_id"] not in self._research_stages[key]
+            for key, description in self._research_contracts.items()
+        ):
+            raise ValueError("公共执行配置必须绑定真实阶段")
+
+    def research_contract(self, protocol_ref, arm_id):
+        """读取冻结目标副本；未知协议返回 None，不执行模型、不改变计划。"""
+        from copy import deepcopy
+
+        return deepcopy(self._research_contracts.get((protocol_ref, arm_id)))
 
     def capabilities(self) -> tuple[CapabilityReport, ...]:
         """按组件标识返回启动时完成的能力发现结果。"""
